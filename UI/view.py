@@ -1,0 +1,558 @@
+import flet as ft
+
+
+
+# COLORI TEMA - Variabili per una gestione centralizzata
+
+BLU_PRIMARIO = "#3B82F6"
+BLU_SCURO = "#1E293B"
+BLU_SCURO_ALPHA = "#1E293BCC"
+BLU_NOTTE = "#0F172A"
+BLU_CHAT = "#1e1e2e"
+VERDE = "#10B981"
+VIOLA = "#8B5CF6"
+ARANCIO = "#F59E0B"
+ROSSO = "#EF4444"
+CIANO = "#06B6D4"
+ROSA = "#EC4899"
+LIME = "#84CC16"
+TESTO_CHIARO = "#F8FAFC"
+TESTO_SECONDARIO = "#94A3B8"
+BORDO = "#334155"
+BORDO_SCURO = "#333333"
+BG_RISPOSTA = "#33334d"
+
+# Palette colori per grafici
+CHART_COLORS = [BLU_PRIMARIO, VERDE, VIOLA, ARANCIO, ROSSO, CIANO, ROSA, LIME]
+
+
+class View(ft.UserControl):
+    def __init__(self, page: ft.Page):
+        super().__init__()
+        self._page = page
+        self._page.title = "Digitalizzazione"
+        self._page.horizontal_alignment = "CENTER"
+        self._page.window_width = 1150
+        self._page.window_height = 900
+        self._page.theme_mode = ft.ThemeMode.DARK
+        self._page.bgcolor = BLU_NOTTE
+        self._page.padding = 0
+        
+        self._controller = None
+        self.nav_rail = None
+        self.content_area = None
+        
+        # Grafo Bipartito controls
+        self.dd_sede = None
+        self.dd_fascicolo = None
+        self.btn_graph = None
+        self.btn_stats = None
+        self.btn_penali = None
+        self.btn_operatori = None
+        self.txt_result1 = None
+        self.txt_result2 = None
+        
+        # Upload CSV controls
+        self.csv_file_label = None
+        self.csv_upload_btn = None
+        self.csv_status = None
+        self.csv_progress = None
+        self.btn_start_import = None
+        self.file_picker = None
+        
+        # AI Assistant controls
+        self.ai_dd_provider = None
+        self.ai_txt_api_key = None
+        self.ai_btn_load = None
+        self.ai_dd_model = None
+        self.ai_txt_question = None
+        self.ai_btn_send = None
+        self.ai_chat_history = None
+        self.ai_status_text = None
+        self.ai_progress = None
+        
+        # Grafici controls
+        self.chart_selector = None
+        self.chart_container = None
+        self.chart_content = None
+        self.chart_title_text = None
+        self.btn_generate_chart = None
+        self.stat_card_pagine = None
+        self.stat_card_operatori = None
+        self.stat_card_fascicoli = None
+        self.stat_card_media = None
+
+
+
+    def load_interface(self):
+        self.file_picker = ft.FilePicker(on_result=self._on_file_result)
+        self._page.overlay.append(self.file_picker)
+        
+        self.nav_rail = ft.NavigationRail(
+            selected_index=0,
+            label_type=ft.NavigationRailLabelType.ALL,
+            min_width=100,
+            min_extended_width=200,
+            bgcolor=BLU_SCURO,
+            indicator_color=BLU_PRIMARIO,
+            expand=True,
+            on_change=self._on_nav_change,
+            destinations=[
+                ft.NavigationRailDestination(icon=ft.icons.HUB_OUTLINED, selected_icon=ft.icons.HUB, label="Grafo", padding=10),
+                ft.NavigationRailDestination(icon=ft.icons.UPLOAD_FILE_OUTLINED, selected_icon=ft.icons.UPLOAD_FILE, label="Upload CSV", padding=10),
+                ft.NavigationRailDestination(icon=ft.icons.SMART_TOY_OUTLINED, selected_icon=ft.icons.SMART_TOY, label="AI Assistant", padding=10),
+                ft.NavigationRailDestination(icon=ft.icons.BAR_CHART_OUTLINED, selected_icon=ft.icons.BAR_CHART, label="Grafici", padding=10),
+            ],
+        )
+
+        sidebar = ft.Column([
+            ft.Container(
+                content=ft.Column([
+                    ft.Icon(ft.icons.DOCUMENT_SCANNER, size=40, color=BLU_PRIMARIO),
+                    ft.Text("Digitalizzazione", size=12, weight="bold", color=TESTO_CHIARO),
+                ], horizontal_alignment="center", spacing=5),
+                padding=20,
+            ),
+            ft.Divider(height=1, color=BORDO),
+            self.nav_rail,
+        ], spacing=0)
+
+        sidebar_container = ft.Container(
+            content=sidebar,
+            bgcolor=BLU_SCURO,
+            border=ft.border.only(right=ft.BorderSide(1, BORDO)),
+            width=120,
+        )
+
+        self.content_area = ft.Container(content=self._build_grafo_page(), expand=True, padding=30)
+
+        self._page.controls.clear()
+        self._page.controls.append(ft.Row([sidebar_container, self.content_area], expand=True, spacing=0))
+        self._page.update()
+
+    def _on_nav_change(self, e):
+        pages = [self._build_grafo_page, self._build_upload_csv_page, self._build_ai_assistant_page, self._build_grafici_page]
+        self.content_area.content = pages[e.control.selected_index]()
+        self._page.update()
+
+
+    # PAGINA 1: GRAFO BIPARTITO
+
+    def _build_grafo_page(self):
+        header = ft.Container(
+            content=ft.Column([
+                ft.Text("Grafo Bipartito", size=36, weight="bold", color=TESTO_CHIARO),
+                ft.Text("Analisi Operatori / Fascicoli", color=TESTO_SECONDARIO, size=14),
+            ], horizontal_alignment="center", spacing=5),
+            padding=ft.padding.only(bottom=20)
+        )
+
+        self.dd_sede = ft.Dropdown(
+            label="Sede", hint_text="Seleziona una sede", width=350,
+            border_color=BORDO, focused_border_color=BLU_PRIMARIO,
+            bgcolor=BLU_SCURO, border_radius=12, color=TESTO_CHIARO,
+            label_style=ft.TextStyle(color=TESTO_SECONDARIO),
+        )
+        if self._controller:
+            self._controller.fill_dd_sede()
+
+        self.btn_graph = ft.ElevatedButton(
+            text="Crea Grafo", icon="account_tree",
+            on_click=self._controller.handle_graph if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=BLU_PRIMARIO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+        
+        self.btn_stats = ft.ElevatedButton(
+            text="Calcola Statistiche", icon="analytics", disabled=True,
+            on_click=self._controller.handle_stats if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=VERDE, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+        
+        self.btn_penali = ft.ElevatedButton(
+            text="Calcola Penali", icon="warning",
+            on_click=self._controller.handle_calcola_penali if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=ARANCIO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        controls_section = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="location_city", color=BLU_PRIMARIO, size=24),
+                        ft.Text("Selezione Sede", size=18, weight="w600", color=TESTO_CHIARO)], spacing=10),
+                ft.Divider(height=20, color=BORDO),
+                ft.Row([self.dd_sede], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Container(height=15),
+                ft.Row([self.btn_graph, self.btn_stats, self.btn_penali], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+            ], spacing=10),
+            padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
+        )
+
+        self.dd_fascicolo = ft.Dropdown(
+            label="Fascicolo", hint_text="Seleziona un fascicolo", width=400,
+            border_color=BORDO, focused_border_color=BLU_PRIMARIO,
+            bgcolor=BLU_SCURO, border_radius=12, color=TESTO_CHIARO,
+            label_style=ft.TextStyle(color=TESTO_SECONDARIO),
+        )
+        
+        self.btn_operatori = ft.ElevatedButton(
+            text="Chi ha lavorato?", icon="group", disabled=True,
+            on_click=self._controller.handle_operatori_fascicolo if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=VIOLA, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        fascicolo_section = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="folder_open", color=VIOLA, size=24),
+                        ft.Text("Analisi Fascicolo", size=18, weight="w600", color=TESTO_CHIARO)], spacing=10),
+                ft.Divider(height=20, color=BORDO),
+                ft.Row([self.dd_fascicolo, self.btn_operatori], alignment=ft.MainAxisAlignment.CENTER, spacing=20, wrap=True),
+            ], spacing=10),
+            padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
+        )
+
+        self.txt_result1 = ft.ListView(expand=1, spacing=8, padding=15, auto_scroll=False)
+        self.txt_result2 = ft.ListView(expand=1, spacing=8, padding=15, auto_scroll=False)
+        self.txt_result1.controls.append(ft.Text(" Risultati Grafo", color=TESTO_SECONDARIO, size=14, italic=True))
+        self.txt_result2.controls.append(ft.Text(" Statistiche", color=TESTO_SECONDARIO, size=14, italic=True))
+
+        container1 = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="hub", color=BLU_PRIMARIO, size=20),
+                        ft.Text("Risultati Grafo", weight="w600", color=TESTO_CHIARO, size=16)], spacing=8),
+                ft.Divider(height=15, color=BORDO),
+                ft.Container(content=self.txt_result1, expand=True),
+            ]),
+            padding=20, bgcolor=BLU_SCURO, width=420, height=320, border_radius=16, border=ft.border.all(1, BORDO),
+        )
+        
+        container2 = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="bar_chart", color=VERDE, size=20),
+                        ft.Text("Statistiche", weight="w600", color=TESTO_CHIARO, size=16)], spacing=8),
+                ft.Divider(height=15, color=BORDO),
+                ft.Container(content=self.txt_result2, expand=True),
+            ]),
+            padding=20, bgcolor=BLU_SCURO, width=420, height=320, border_radius=16, border=ft.border.all(1, BORDO),
+        )
+
+        return ft.Column([
+            header, controls_section, ft.Container(height=15),
+            fascicolo_section, ft.Container(height=20),
+            ft.Row([container1, container2], alignment=ft.MainAxisAlignment.CENTER, spacing=30),
+        ], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO)
+
+
+    # PAGINA 2: UPLOAD CSV
+
+    def _build_upload_csv_page(self):
+        self.csv_file_label = ft.Text("Nessun file selezionato", color=TESTO_SECONDARIO)
+        self.csv_status = ft.Text("Pronto per iniziare...", color=TESTO_SECONDARIO)
+        self.csv_progress = ft.ProgressBar(width=600, color=BLU_PRIMARIO, value=0, bgcolor=BORDO)
+        
+        self.csv_upload_btn = ft.ElevatedButton(
+            "Seleziona File CSV", icon="folder_open",
+            on_click=self._controller.handle_file_pick if self._controller else None,
+        )
+        
+        self.btn_start_import = ft.ElevatedButton(
+            "Inizia Importazione", icon="upload",
+            on_click=self._controller.handle_start_import if self._controller else None,
+            disabled=True,
+            style=ft.ButtonStyle(bgcolor=VERDE, color="white", padding=24, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        main_container = ft.Container(
+            content=ft.Column([
+                ft.Text("Database Uploader", size=36, weight="bold", color=TESTO_CHIARO),
+                ft.Text("Caricamento dati in db_digital7", color=TESTO_SECONDARIO),
+                ft.Divider(height=40, color=BLU_SCURO),
+                ft.Row([self.csv_upload_btn, self.csv_file_label], alignment="center"),
+                ft.Divider(height=30, color=BLU_SCURO),
+                ft.Container(
+                    content=ft.Column([self.csv_status, self.csv_progress], spacing=15),
+                    padding=30, bgcolor=BLU_SCURO, border_radius=16
+                ),
+                ft.Container(height=20),
+                self.btn_start_import
+            ], horizontal_alignment="center"),
+            padding=40, bgcolor=BLU_SCURO_ALPHA, border_radius=30, border=ft.border.all(1, BORDO)
+        )
+
+        return ft.Column([main_container], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO, expand=True)
+
+
+    # PAGINA 3: AI ASSISTANT
+
+    def _build_ai_assistant_page(self):
+        self.ai_dd_provider = ft.Dropdown(
+            label="1. Scegli Provider",
+            options=[
+                ft.dropdown.Option("Ollama (Locale)"),
+                ft.dropdown.Option("LM Studio (Locale)"),
+                ft.dropdown.Option("Groq"),
+                ft.dropdown.Option("OpenAI"),
+            ],
+            width=230, value="Ollama (Locale)", on_change=self._on_provider_change
+        )
+        self.ai_txt_api_key = ft.TextField(label="2. API Key", password=True, expand=True, value="n/a", disabled=True)
+        self.ai_btn_load = ft.ElevatedButton("3. Carica Modelli", icon=ft.icons.REFRESH,
+                                              on_click=self._controller.handle_load_models if self._controller else None)
+        self.ai_dd_model = ft.Dropdown(label="4. Scegli il Modello", options=[], width=450, disabled=True)
+        
+        self.ai_txt_question = ft.TextField(
+            label=" SCRIVI QUI LA TUA DOMANDA",
+            hint_text="Esempio: Quante pagine ha inserito Rossi nel 2024?",
+            border_color=BLU_PRIMARIO, border_width=2, height=70, expand=True,
+            on_submit=self._controller.handle_ai_send if self._controller else None
+        )
+        self.ai_btn_send = ft.ElevatedButton(
+            "CHIEDI ALL'IA", icon=ft.icons.SEND,
+            on_click=self._controller.handle_ai_send if self._controller else None,
+            bgcolor=BLU_PRIMARIO, color="white", height=70
+        )
+
+        self.ai_chat_history = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
+        self.ai_status_text = ft.Text("Pronto.", size=12, color=TESTO_SECONDARIO)
+        self.ai_progress = ft.ProgressBar(visible=False, color=BLU_PRIMARIO)
+
+        return ft.Container(
+            padding=30, expand=True,
+            content=ft.Column([
+                ft.Text("🤖 AI SQL Data Assistant", size=32, weight="bold", color=TESTO_CHIARO),
+                ft.Row([self.ai_dd_provider, self.ai_txt_api_key, self.ai_btn_load]),
+                ft.Row([self.ai_dd_model], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Divider(height=20, color=BORDO),
+                ft.Row([self.ai_txt_question, self.ai_btn_send]),
+                ft.Row([self.ai_progress, self.ai_status_text], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Container(
+                    content=self.ai_chat_history, expand=True, bgcolor=BLU_CHAT, 
+                    border_radius=15, padding=20, border=ft.border.all(1, BORDO_SCURO)
+                ),
+            ])
+        )
+
+    def _on_provider_change(self, e):
+        is_local = "Locale" in self.ai_dd_provider.value
+        self.ai_txt_api_key.disabled = is_local
+        self.ai_txt_api_key.value = "n/a" if is_local else ""
+        self._page.update()
+
+    # AI ASSISTANT HELPER METHODS
+    def add_ai_message(self, text: str, msg_type: str = "user"):
+        if msg_type == "user":
+            self.ai_chat_history.controls.append(ft.Text(f" DOMANDA: {text}", weight="bold", color=BLU_PRIMARIO))
+        elif msg_type == "system":
+            self.ai_chat_history.controls.append(ft.Text(f"⚡ [SISTEMA] {text}", size=12, color=ARANCIO, italic=True))
+        elif msg_type == "response":
+            self.ai_chat_history.controls.append(ft.Container(
+                content=ft.Text(f"🤖 RISPOSTA: {text}"),
+                bgcolor=BG_RISPOSTA, padding=15, border_radius=10, border=ft.border.all(1, BORDO)
+            ))
+        elif msg_type == "error":
+            self.ai_chat_history.controls.append(ft.Text(f" ERRORE: {text}", color=ROSSO, weight="bold"))
+        self._page.update()
+
+    def update_ai_status(self, msg: str):
+        self.ai_status_text.value = msg
+        self._page.update()
+
+    def set_ai_progress(self, visible: bool):
+        self.ai_progress.visible = visible
+        self._page.update()
+
+
+    # PAGINA 4: GRAFICI
+
+    def _build_grafici_page(self):
+        header = ft.Container(
+            content=ft.Column([
+                ft.Text("Grafici", size=36, weight="bold", color=TESTO_CHIARO),
+                ft.Text("Visualizzazione dati dal database", color=TESTO_SECONDARIO, size=14),
+            ], horizontal_alignment="center", spacing=5),
+            padding=ft.padding.only(bottom=20)
+        )
+
+        self.chart_selector = ft.Dropdown(
+            label="Tipo di grafico", hint_text="Seleziona", width=350,
+            border_color=BORDO, focused_border_color=BLU_PRIMARIO,
+            bgcolor=BLU_SCURO, border_radius=12, color=TESTO_CHIARO,
+            label_style=ft.TextStyle(color=TESTO_SECONDARIO),
+            options=[
+                ft.dropdown.Option("pages_per_operator", "Top 5 Operatori"),
+                ft.dropdown.Option("pages_per_sede", "Pagine per Sede"),
+                ft.dropdown.Option("pages_per_month", "Pagine per Mese"),
+                ft.dropdown.Option("pages_per_ufficio", "Distribuzione per Ufficio"),
+                ft.dropdown.Option("top_fascicoli", "Top 5 Fascicoli"),
+            ]
+        )
+
+        self.btn_generate_chart = ft.ElevatedButton(
+            text="Genera Grafico", icon=ft.icons.AUTO_GRAPH,
+            style=ft.ButtonStyle(bgcolor=BLU_PRIMARIO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12)),
+            on_click=self._controller.handle_generate_chart if self._controller else None
+        )
+
+        self.chart_title_text = ft.Text("Seleziona un grafico", size=18, weight="w600", color=TESTO_CHIARO)
+        
+        self.chart_content = ft.Container(
+            content=ft.Column([
+                ft.Icon(name=ft.icons.BAR_CHART, color=TESTO_SECONDARIO, size=80),
+                ft.Text("Seleziona un tipo di grafico e clicca 'Genera'", color=TESTO_SECONDARIO, size=14),
+            ], horizontal_alignment="center", alignment="center", spacing=15),
+            height=300, expand=True, alignment=ft.alignment.center
+        )
+
+        self.chart_container = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="auto_graph", color=BLU_PRIMARIO, size=24), self.chart_title_text], spacing=10),
+                ft.Divider(height=20, color=BORDO),
+                self.chart_content,
+            ]),
+            padding=30, bgcolor=BLU_SCURO, border_radius=20, border=ft.border.all(1, BORDO), width=850, height=420,
+        )
+
+        self.stat_card_pagine = self._create_stat_card("Totale Pagine", "---", ft.icons.DESCRIPTION, BLU_PRIMARIO)
+        self.stat_card_operatori = self._create_stat_card("Operatori", "---", ft.icons.PEOPLE, VERDE)
+        self.stat_card_fascicoli = self._create_stat_card("Fascicoli", "---", ft.icons.FOLDER, VIOLA)
+        self.stat_card_media = self._create_stat_card("Media/Giorno", "---", ft.icons.TRENDING_UP, ARANCIO)
+
+        return ft.Column([
+            header,
+            ft.Row([self.chart_selector, self.btn_generate_chart], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+            ft.Container(height=20), self.chart_container,
+            ft.Container(height=25),
+            ft.Row([self.stat_card_pagine, self.stat_card_operatori, self.stat_card_fascicoli, self.stat_card_media],
+                   alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+        ], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO)
+
+    def _create_stat_card(self, title, value, icon, color):
+        value_text = ft.Text(value, size=24, weight="bold", color=TESTO_CHIARO)
+        return ft.Container(
+            content=ft.Column([
+                ft.Icon(icon, color=color, size=28),
+                value_text,
+                ft.Text(title, size=12, color=TESTO_SECONDARIO),
+            ], horizontal_alignment="center", spacing=5),
+            padding=20, bgcolor=BLU_SCURO, border_radius=16, border=ft.border.all(1, BORDO), width=170,
+            data={"value_text": value_text}
+        )
+
+    def update_chart(self, chart_type: str, data: list):
+        if not data:
+            return
+        
+        titles = {
+            "pages_per_operator": "Top 5 Operatori per Pagine",
+            "pages_per_sede": "Pagine per Sede",
+            "pages_per_month": "Pagine Inserite per Mese",
+            "pages_per_ufficio": "Distribuzione Pagine per Ufficio",
+            "top_fascicoli": "Top 5 Fascicoli più Lavorati",
+        }
+        self.chart_title_text.value = titles.get(chart_type, "Grafico")
+        
+        if chart_type == "pages_per_ufficio":
+            chart = self._create_pie_chart(data)
+        elif chart_type == "pages_per_month":
+            chart = self._create_line_chart(data)
+        else:
+            chart = self._create_bar_chart(data)
+        
+        self.chart_content.content = chart
+        self._page.update()
+
+    def _create_bar_chart(self, data: list) -> ft.BarChart:
+        bar_groups, labels, max_val = [], [], 0
+        
+        for i, item in enumerate(data[:10]):
+            nome = str(item.get("nome", f"Item {i+1}"))
+            totale = int(item.get("totale", 0))
+            max_val = max(max_val, totale)
+            color = CHART_COLORS[i % len(CHART_COLORS)]
+            bar_groups.append(ft.BarChartGroup(x=i, bar_rods=[
+                ft.BarChartRod(from_y=0, to_y=totale, width=50, color=color, border_radius=4, tooltip=f"{nome}: {totale:,}")
+            ]))
+            labels.append(ft.ChartAxisLabel(value=i, label=ft.Text(nome[:12] + "..." if len(nome) > 12 else nome, color=TESTO_SECONDARIO, size=10)))
+        
+        return ft.BarChart(
+            bar_groups=bar_groups, border=ft.border.all(1, BORDO),
+            left_axis=ft.ChartAxis(labels_size=50, title=ft.Text("Pagine", color=TESTO_SECONDARIO), title_size=14),
+            bottom_axis=ft.ChartAxis(labels=labels, labels_size=50),
+            horizontal_grid_lines=ft.ChartGridLines(color=BORDO, width=1, dash_pattern=[3, 3]),
+            tooltip_bgcolor=BLU_SCURO, max_y=max_val * 1.15 if max_val > 0 else 100, expand=True, animate=500,
+        )
+
+    def _create_pie_chart(self, data: list) -> ft.PieChart:
+        sections = []
+        total = sum(int(item.get("totale", 0)) for item in data)
+        
+        for i, item in enumerate(data[:8]):
+            nome = str(item.get("nome", f"Item {i+1}"))
+            totale = int(item.get("totale", 0))
+            percentage = (totale / total * 100) if total > 0 else 0
+            sections.append(ft.PieChartSection(
+                value=totale, title=f"{nome}\n{percentage:.1f}%",
+                title_style=ft.TextStyle(size=10, color=TESTO_CHIARO, weight="bold"),
+                color=CHART_COLORS[i % len(CHART_COLORS)], radius=120,
+            ))
+        
+        return ft.PieChart(sections=sections, sections_space=2, center_space_radius=50, expand=True, animate=500)
+
+    def _create_line_chart(self, data: list) -> ft.LineChart:
+        data_points, labels, max_val = [], [], 0
+        
+        for i, item in enumerate(data[-12:]):
+            mese = str(item.get("mese", ""))
+            totale = int(item.get("totale", 0))
+            max_val = max(max_val, totale)
+            data_points.append(ft.LineChartDataPoint(i, totale, tooltip=f"{mese}: {totale:,}"))
+            if i % 2 == 0 or len(data) <= 6:
+                labels.append(ft.ChartAxisLabel(value=i, label=ft.Text(mese[-5:] if len(mese) > 5 else mese, color=TESTO_SECONDARIO, size=10)))
+        
+        return ft.LineChart(
+            data_series=[ft.LineChartData(
+                data_points=data_points, stroke_width=3, color=BLU_PRIMARIO,
+                curved=True, stroke_cap_round=True, below_line_bgcolor=f"{BLU_PRIMARIO}33",
+            )],
+            border=ft.border.all(1, BORDO),
+            left_axis=ft.ChartAxis(labels_size=50, title=ft.Text("Pagine", color=TESTO_SECONDARIO), title_size=14),
+            bottom_axis=ft.ChartAxis(labels=labels, labels_size=40),
+            horizontal_grid_lines=ft.ChartGridLines(color=BORDO, width=1, dash_pattern=[3, 3]),
+            tooltip_bgcolor=BLU_SCURO, min_y=0, max_y=max_val * 1.15 if max_val > 0 else 100, expand=True, animate=500,
+        )
+
+    def update_stats_cards(self, stats: dict):
+        def fmt(n): return f"{n:,}".replace(",", ".")
+        self.stat_card_pagine.data["value_text"].value = fmt(stats.get("totale_pagine", 0))
+        self.stat_card_operatori.data["value_text"].value = fmt(stats.get("operatori", 0))
+        self.stat_card_fascicoli.data["value_text"].value = fmt(stats.get("fascicoli", 0))
+        self.stat_card_media.data["value_text"].value = fmt(stats.get("media_giorno", 0))
+
+
+
+    # UTILITY METHODS
+
+    def open_file_picker(self):
+        self.file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.ANY, allowed_extensions=["csv"])
+
+    def _on_file_result(self, e: ft.FilePickerResultEvent):
+        if self._controller:
+            self._controller.on_file_result(e)
+
+    def create_alert(self, message):
+        dlg = ft.AlertDialog(title=ft.Text(message, color=TESTO_CHIARO), bgcolor=BLU_SCURO, shape=ft.RoundedRectangleBorder(radius=16))
+        self._page.dialog = dlg
+        dlg.open = True
+        self._page.update()
+
+    @property
+    def controller(self):
+        return self._controller
+
+    @controller.setter
+    def controller(self, controller):
+        self._controller = controller
+
+    def set_controller(self, controller):
+        self._controller = controller
+
+    def update_page(self):
+        self._page.update()
