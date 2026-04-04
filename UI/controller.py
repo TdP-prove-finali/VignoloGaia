@@ -1,5 +1,5 @@
 import flet as ft
-from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO
+from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO, CIANO
 from model.modello import Model
 
 
@@ -10,12 +10,14 @@ class Controller:
         self._selected_file_path = None   # CSV import state
 
     def fill_dd_sede(self):
+        """Popola il dropdown con le sedi disponibili."""
         sedi = self._model.get_sedi()
         self._view.dd_sede.options.clear()
         for s in sedi:
             self._view.dd_sede.options.append(ft.dropdown.Option(f"{s}"))
 
     def fill_dd_fascicolo(self):
+        """Popola il dropdown con i fascicoli disponibili."""
         fascicoli = self._model.get_nodes_fascicoli()
         fascicoli.sort(key=lambda f: str(f))
         self._view.dd_fascicolo.options.clear()
@@ -26,9 +28,8 @@ class Controller:
             ))
 
     #GRAFICI HANDLERS
-
     def handle_graph(self, e):
-        # legge la sede selezionata
+
         if self._view.dd_sede.value is None or self._view.dd_sede.value == "":
             self._view.create_alert("Selezionare una sede!")
             return
@@ -105,7 +106,7 @@ class Controller:
 
         self._view.update_page()
 
-
+    # PENALI HANDLER
     def handle_calcola_penali(self, e):
         """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno."""
         self._view.txt_result2.controls.clear()
@@ -156,8 +157,48 @@ class Controller:
         self._view.update_page()
 
 
-    # CSV IMPORT HANDLERS
+    # PAGAMENTI HANDLERS
+    def fill_dd_mese(self):
+        """Popola il dropdown dei mesi disponibili."""
+        mesi = self._model.get_mesi_disponibili()
+        self._view.dd_mese.options.clear()
+        for m in mesi:
+            self._view.dd_mese.options.append(ft.dropdown.Option(key=m, text=m))
 
+
+    def handle_calcola_pagamenti(self, e):
+        """Calcola i pagamenti dovuti per gli operatori nel mese selezionato."""
+        self._view.txt_result2.controls.clear()
+        
+        if not self._view.dd_mese.value:
+            self._view.create_alert("Selezionare un mese!")
+            return
+        
+        mese = self._view.dd_mese.value
+        
+        try:
+            # Controllo anomalie
+            anomalie = self._model.get_anomalie_attivita()
+            if anomalie:
+                self._view.mostra_anomalie(anomalie)
+
+            dati = self._model.get_pagamenti_operatori(mese)
+            
+            if not dati["operatori"]:
+                self._view.txt_result2.controls.append(
+                    ft.Text(f"Nessun pagamento per {mese}.", weight=ft.FontWeight.BOLD, color=TESTO_SECONDARIO))
+                self._view.update_page()
+                return
+
+            self._view.mostra_pagamenti(mese, dati)
+            
+        except Exception as ex:
+            self._view.txt_result2.controls.append(ft.Text(f"Errore: {ex}", color=ROSSO))
+        
+        self._view.update_page()
+
+
+    # CSV IMPORT HANDLERS
     def handle_file_pick(self, e):
         """Apre il FilePicker per selezionare il file CSV."""
         self._view.open_file_picker()
@@ -211,7 +252,6 @@ class Controller:
 
 
     # AI ASSISTANT HANDLERS
-
     def handle_load_models(self, e):
         """Carica i modelli dal provider selezionato."""
         self._view.ai_progress.visible = True
@@ -289,9 +329,8 @@ class Controller:
 
 
     # GRAFICI HANDLERS
-
     def handle_generate_chart(self, e):
-        """Genera il grafico selezionato con dati reali dal database."""
+        """Genera il grafico selezionato con i dati dal database."""
         if self._view.chart_selector.value is None:
             self._view.create_alert("Seleziona un tipo di grafico!")
             return

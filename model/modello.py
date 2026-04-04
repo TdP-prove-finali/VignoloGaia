@@ -246,3 +246,30 @@ class Model:
         """Ritorna la lista degli operatori con penali.
         Ogni elemento contiene: ID_Operatore, Nome_Operatore, giorni_penale, totale_penale."""
         return DAO.get_penali_operatori()
+
+
+    # PAGAMENTI LOGIC
+
+    def get_mesi_disponibili(self) -> list:
+        """Ritorna la lista dei mesi disponibili """
+        return DAO.get_mesi_disponibili()
+
+    def get_anomalie_attivita(self) -> list:
+        """Ritorna la lista delle anomalie (operatori con più attività dello stesso tipo nella stessa data)."""
+        return DAO.get_anomalie_attivita()
+
+    def get_pagamenti_operatori(self, mese: str) -> dict:
+        """Ritorna i pagamenti con totali calcolati.
+        
+        Returns:
+            dict con 'operatori' (lista), 'totale_pagine' (int), 'totale_euro' (float)
+        """
+        pagamenti = DAO.get_pagamenti_operatori(mese)
+        totale_pagine = sum(int(row.get("pagine_nette", 0)) for row in pagamenti)
+        totale_euro = sum(float(row.get("totale_pagamento", 0)) for row in pagamenti)
+        
+        return {
+            "operatori": pagamenti,
+            "totale_pagine": totale_pagine,
+            "totale_euro": totale_euro
+        }

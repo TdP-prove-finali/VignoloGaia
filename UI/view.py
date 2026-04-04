@@ -45,9 +45,11 @@ class View(ft.UserControl):
         # Grafo Bipartito controls
         self.dd_sede = None
         self.dd_fascicolo = None
+        self.dd_mese = None
         self.btn_graph = None
         self.btn_stats = None
         self.btn_penali = None
+        self.btn_pagamenti = None
         self.btn_operatori = None
         self.txt_result1 = None
         self.txt_result2 = None
@@ -98,7 +100,7 @@ class View(ft.UserControl):
             expand=True,
             on_change=self._on_nav_change,
             destinations=[
-                ft.NavigationRailDestination(icon=ft.icons.HUB_OUTLINED, selected_icon=ft.icons.HUB, label="Grafo", padding=10),
+                ft.NavigationRailDestination(icon=ft.icons.HUB_OUTLINED, selected_icon=ft.icons.HUB, label="Home", padding=10),
                 ft.NavigationRailDestination(icon=ft.icons.UPLOAD_FILE_OUTLINED, selected_icon=ft.icons.UPLOAD_FILE, label="Upload CSV", padding=10),
                 ft.NavigationRailDestination(icon=ft.icons.SMART_TOY_OUTLINED, selected_icon=ft.icons.SMART_TOY, label="AI Assistant", padding=10),
                 ft.NavigationRailDestination(icon=ft.icons.BAR_CHART_OUTLINED, selected_icon=ft.icons.BAR_CHART, label="Grafici", padding=10),
@@ -109,7 +111,7 @@ class View(ft.UserControl):
             ft.Container(
                 content=ft.Column([
                     ft.Icon(ft.icons.DOCUMENT_SCANNER, size=40, color=BLU_PRIMARIO),
-                    ft.Text("Digitalizzazione", size=12, weight="bold", color=TESTO_CHIARO),
+                    ft.Text("GSD", size=12, weight="bold", color=TESTO_CHIARO),
                 ], horizontal_alignment="center", spacing=5),
                 padding=20,
             ),
@@ -124,25 +126,25 @@ class View(ft.UserControl):
             width=120,
         )
 
-        self.content_area = ft.Container(content=self._build_grafo_page(), expand=True, padding=30)
+        self.content_area = ft.Container(content=self._build_home_page(), expand=True, padding=30)
 
         self._page.controls.clear()
         self._page.controls.append(ft.Row([sidebar_container, self.content_area], expand=True, spacing=0))
         self._page.update()
 
     def _on_nav_change(self, e):
-        pages = [self._build_grafo_page, self._build_upload_csv_page, self._build_ai_assistant_page, self._build_grafici_page]
+        pages = [self._build_home_page, self._build_upload_csv_page, self._build_ai_assistant_page, self._build_grafici_page]
         self.content_area.content = pages[e.control.selected_index]()
         self._page.update()
 
 
-    # PAGINA 1: GRAFO BIPARTITO
+    # PAGINA 1: HOME PAGE
 
-    def _build_grafo_page(self):
+    def _build_home_page(self):
         header = ft.Container(
             content=ft.Column([
-                ft.Text("Grafo Bipartito", size=36, weight="bold", color=TESTO_CHIARO),
-                ft.Text("Analisi Operatori / Fascicoli", color=TESTO_SECONDARIO, size=14),
+                ft.Text("GSD", size=36, weight="bold", color=TESTO_CHIARO),
+                ft.Text("Gestione servizi digitalizazione", color=TESTO_SECONDARIO, size=14),
             ], horizontal_alignment="center", spacing=5),
             padding=ft.padding.only(bottom=20)
         )
@@ -186,6 +188,33 @@ class View(ft.UserControl):
             padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
         )
 
+        # Sezione Pagamenti
+        self.dd_mese = ft.Dropdown(
+            label="Mese", hint_text="Seleziona un mese", width=200,
+            border_color=BORDO, focused_border_color=CIANO,
+            bgcolor=BLU_SCURO, border_radius=12, color=TESTO_CHIARO,
+            label_style=ft.TextStyle(color=TESTO_SECONDARIO),
+        )
+        if self._controller:
+            self._controller.fill_dd_mese()
+
+        self.btn_pagamenti = ft.ElevatedButton(
+            text="Calcola Pagamenti", icon="payments",
+            on_click=self._controller.handle_calcola_pagamenti if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=CIANO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        pagamenti_section = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="euro", color=CIANO, size=24),
+                        ft.Text("Calcolo Pagamenti", size=18, weight="w600", color=TESTO_CHIARO)], spacing=10),
+                ft.Divider(height=20, color=BORDO),
+                ft.Row([self.dd_mese, self.btn_pagamenti], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+            ], spacing=10),
+            padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
+        )
+
+        #sezione fascicoli
         self.dd_fascicolo = ft.Dropdown(
             label="Fascicolo", hint_text="Seleziona un fascicolo", width=400,
             border_color=BORDO, focused_border_color=BLU_PRIMARIO,
@@ -236,9 +265,66 @@ class View(ft.UserControl):
 
         return ft.Column([
             header, controls_section, ft.Container(height=15),
+            pagamenti_section, ft.Container(height=15),
             fascicolo_section, ft.Container(height=20),
             ft.Row([container1, container2], alignment=ft.MainAxisAlignment.CENTER, spacing=30),
         ], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO)
+
+    # Pagamenti metodi di visualizazione
+    def _fmt_num(self, n) -> str:
+        """Formatta numero con separatore delle migliaia ."""
+        return f"{int(n):,}".replace(",", ".")
+
+    def _fmt_euro(self, n) -> str:
+        """Formatta euro con virgola """
+        return f"{float(n):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def mostra_anomalie(self, anomalie: list):
+        """Visualizza le anomalie nella ListView."""
+        self.txt_result2.controls.append(
+            ft.Text("ANOMALIE RILEVATE", weight=ft.FontWeight.BOLD, color=ROSSO))
+        self.txt_result2.controls.append(
+            ft.Text("Operatori con più attività dello stesso tipo nella stessa data:",
+                    color=TESTO_SECONDARIO, size=12))
+        self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+
+        for row in anomalie[:10]:
+            self.txt_result2.controls.append(
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_Operatore']}", color=ARANCIO, size=12))
+            self.txt_result2.controls.append(
+                ft.Text(f"   Data: {row['Data_Attivita']} | {row['Attivita']} x{row['conteggio']}",
+                        color=TESTO_SECONDARIO, size=11))
+
+        if len(anomalie) > 10:
+            self.txt_result2.controls.append(
+                ft.Text(f"   ... e altre {len(anomalie) - 10} anomalie", color=TESTO_SECONDARIO, size=11, italic=True))
+
+        self.txt_result2.controls.append(ft.Container(height=15))
+
+    def mostra_pagamenti(self, mese: str, dati: dict):
+        """Visualizza i pagamenti nella ListView."""
+        self.txt_result2.controls.append(
+            ft.Text(f"PAGAMENTI MESE {mese} (0,139 €/pag)", weight=ft.FontWeight.BOLD, color=CIANO))
+        self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+
+        # Dettaglio operatori
+        for row in dati["operatori"]:
+            self.txt_result2.controls.append(
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_Operatore']}",
+                        weight=ft.FontWeight.BOLD, color=TESTO_CHIARO))
+            self.txt_result2.controls.append(
+                ft.Text(
+                    f"   Inserite: {self._fmt_num(row['pag_inserite'])} | Eliminate: {self._fmt_num(row['pag_eliminate'])} | Nette: {self._fmt_num(row['pagine_nette'])}",
+                    color=TESTO_SECONDARIO))
+            self.txt_result2.controls.append(
+                ft.Text(f"   Pagamento: € {self._fmt_euro(row['totale_pagamento'])}", color=VERDE))
+            self.txt_result2.controls.append(ft.Container(height=5))
+
+        # Totali
+        self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+        self.txt_result2.controls.append(
+            ft.Text(f"TOTALE: {self._fmt_num(dati['totale_pagine'])} pag -> € {self._fmt_euro(dati['totale_euro'])}",
+                    weight=ft.FontWeight.BOLD, size=16, color=VERDE))
 
 
     # PAGINA 2: UPLOAD CSV
@@ -278,6 +364,14 @@ class View(ft.UserControl):
         )
 
         return ft.Column([main_container], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO, expand=True)
+
+    # file pickers methods
+    def open_file_picker(self):
+        self.file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.ANY, allowed_extensions=["csv"])
+
+    def _on_file_result(self, e: ft.FilePickerResultEvent):
+        if self._controller:
+            self._controller.on_file_result(e)
 
 
     # PAGINA 3: AI ASSISTANT
@@ -336,7 +430,7 @@ class View(ft.UserControl):
         self.ai_txt_api_key.value = "n/a" if is_local else ""
         self._page.update()
 
-    # AI ASSISTANT HELPER METHODS
+    # ai assistant methods
     def add_ai_message(self, text: str, msg_type: str = "user"):
         if msg_type == "user":
             self.ai_chat_history.controls.append(ft.Text(f" DOMANDA: {text}", weight="bold", color=BLU_PRIMARIO))
@@ -527,16 +621,7 @@ class View(ft.UserControl):
         self.stat_card_media.data["value_text"].value = fmt(stats.get("media_giorno", 0))
 
 
-
     # UTILITY METHODS
-
-    def open_file_picker(self):
-        self.file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.ANY, allowed_extensions=["csv"])
-
-    def _on_file_result(self, e: ft.FilePickerResultEvent):
-        if self._controller:
-            self._controller.on_file_result(e)
-
     def create_alert(self, message):
         dlg = ft.AlertDialog(title=ft.Text(message, color=TESTO_CHIARO), bgcolor=BLU_SCURO, shape=ft.RoundedRectangleBorder(radius=16))
         self._page.dialog = dlg

@@ -93,6 +93,7 @@ class DAO:
 
     @staticmethod
     def get_nodes_operatori(sede: str) -> list[Operatore]:
+        """Restituisce i nodi di tipo operatore"""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -118,6 +119,7 @@ class DAO:
 
     @staticmethod
     def get_nodes_fascicoli(sede: str) -> list[Fascicolo]:
+        """Restituisce i nodi di tipo fascicolo"""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -170,7 +172,7 @@ class DAO:
 
     @staticmethod
     def get_table_schema() -> str:
-        """Ritorna lo schema della tabella come stringa."""
+        """Ritorna lo schema della tabella come stringa (per AI)"""
         cnx = DBConnect.get_connection()
         if cnx is None:
             return "Sede, Nome_Operatore, Data_Attivita, conta_pagine_giorno"
@@ -258,7 +260,7 @@ class DAO:
     @staticmethod
     def get_pages_per_month() -> list:
         """Ritorna le pagine inserite per mese.
-        Gestisce date in formato stringa (dd/mm/yyyy) o DATE MySQL."""
+        Gestisce date in formato stringa (dd/mm/yyyy)"""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -267,22 +269,14 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             # Query che gestisce sia DATE che stringhe formato dd/mm/yyyy
-            query = """SELECT 
-                         CASE 
-                           WHEN Data_Attivita REGEXP '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' 
-                           THEN CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2))
-                           WHEN Data_Attivita REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-                           THEN SUBSTRING(Data_Attivita, 1, 7)
-                           ELSE DATE_FORMAT(Data_Attivita, '%Y-%m')
-                         END as mese,
-                         SUM(conta_pagine_giorno) as totale
-                       FROM digitalizzazione
-                       WHERE Attivita = 'Inserimento_Pagina'
-                         AND Data_Attivita IS NOT NULL
-                         AND Data_Attivita != ''
-                       GROUP BY mese
-                       HAVING mese IS NOT NULL
-                       ORDER BY mese ASC"""
+            query = """SELECT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese,
+                        SUM(conta_pagine_giorno) as totale
+                        FROM digitalizzazione
+                        WHERE Attivita = 'Inserimento_Pagina'
+                        AND Data_Attivita IS NOT NULL
+                        AND Data_Attivita != ''
+                        GROUP BY mese
+                        ORDER BY mese ASC"""
             cursor.execute(query)
             result = cursor.fetchall()
             cursor.close()
@@ -426,6 +420,101 @@ class DAO:
             cursor.close()
         except Exception as e:
             print(f"Errore get_penali_operatori: {e}")
+        finally:
+            cnx.close()
+        return result
+
+
+    # PAGAMENTI - Database Methods
+
+    # Costante per il calcolo pagamenti
+    COSTO_COPIA = 0.139
+
+    @staticmethod
+    def get_mesi_disponibili() -> list:
+        """Ritorna la lista dei mesi disponibili"""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            print("Connessione fallita")
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT DISTINCT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese
+                FROM digitalizzazione
+                WHERE Data_Attivita IS NOT NULL AND Data_Attivita != ''
+                ORDER BY mese DESC
+            """
+            cursor.execute(query)
+            for row in cursor:
+                if row["mese"]:
+                    result.append(row["mese"])
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_mesi_disponibili: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def get_anomalie_attivita() -> list:
+        """Trova operatori con più di una attività dello stesso tipo nella stessa data.
+        Ritorna lista di dict con ID_Operatore, Nome_Operatore, Data_Attivita, Attivita, conteggio."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            print("Connessione fallita")
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT  ID_Operatore,Nome_Operatore,Data_Attivita,Attivita,COUNT(*) as conteggio
+                FROM digitalizzazione
+                GROUP BY ID_Operatore, Nome_Operatore, Data_Attivita, Attivita
+                HAVING conteggio > 1
+                ORDER BY Data_Attivita DESC, Nome_Operatore
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_anomalie_attivita: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def get_pagamenti_operatori(mese: str) -> list:
+        """Calcola i pagamenti dovuti per ogni operatore nel mese specificato.
+        Pagine prodotte = pagine inserite (ID_attivita=1) - pagine eliminate (ID_attivita=-1)
+        Pagamento = pagine_prodotte * 0.139 €
+        Ritorna lista di dict con ID_Operatore, Nome_Operatore, pag_inserite, pag_eliminate, 
+        pagine_nette, totale_pagamento."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            print("Connessione fallita")
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Operatore,Nome_Operatore,
+                    SUM(CASE WHEN ID_attivita = 1 THEN conta_pagine_giorno ELSE 0 END) as pag_inserite,
+                    SUM(CASE WHEN ID_attivita = -1 THEN conta_pagine_giorno ELSE 0 END) as pag_eliminate,
+                    SUM(conta_pagine_giorno * ID_attivita) as pagine_nette,
+                    ROUND(SUM(conta_pagine_giorno * ID_attivita) * 0.139, 2) as totale_pagamento
+                FROM digitalizzazione
+                WHERE CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
+                GROUP BY ID_Operatore, Nome_Operatore
+                HAVING pagine_nette > 0
+                ORDER BY totale_pagamento DESC
+            """
+            cursor.execute(query, (mese,))
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_pagamenti_operatori: {e}")
         finally:
             cnx.close()
         return result
