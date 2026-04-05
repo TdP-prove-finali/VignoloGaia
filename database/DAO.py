@@ -3,7 +3,7 @@ from model.operatore import Operatore
 from model.fascicolo import Fascicolo
 
 #variabile globale che rappresenta il nome della tabella utilizzata nelle query
-TABLE_NAME = "digitalizzazione"
+TABLE_NAME = "digitalizzazione_test"
 
 
 class DAO:
@@ -20,12 +20,12 @@ class DAO:
         try:
             cursor = cnx.cursor()
             query = f"""INSERT INTO {TABLE_NAME} 
-                        (Sede, Ufficio, Attivita, `Nome_Operatore`, ID_Operatore, 
+                        (Sede, Ufficio, Attivita, `Nome_operatore`, ID_Operatore, 
                          ID_attivita, Data_Attivita, ID_Fascicolo, Anno_fascicolo, conta_pagine_giorno) 
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
             cursor.execute(query, (
                 row.get("Sede"), row.get("Ufficio"), row.get("Attivita"),
-                row.get("Nome_Operatore"), row.get("ID_Operatore"), row.get("ID_attivita"),
+                row.get("Nome_operatore"), row.get("ID_Operatore"), row.get("ID_attivita"),
                 formatted_date, row.get("ID_Fascicolo"), row.get("Anno_fascicolo"),
                 row.get("conta_pagine_giorno")
             ))
@@ -37,39 +37,6 @@ class DAO:
             print(f"Errore inserimento: {e}")
             cnx.close()
             return False
-
-    @staticmethod
-    def insert_csv_batch(rows: list, formatted_dates: list) -> int:
-        """Inserisce un batch di righe nel database.
-        Ritorna il numero di righe inserite con successo."""
-        cnx = DBConnect.get_connection()
-        if cnx is None:
-            return 0
-        try:
-            cursor = cnx.cursor()
-            query = f"""INSERT INTO {TABLE_NAME} 
-                        (Sede, Ufficio, Attivita, `Nome_Operatore`, ID_Operatore, 
-                         ID_attivita, Data_Attivita, ID_Fascicolo, Anno_fascicolo, conta_pagine_giorno) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-            
-            count = 0
-            for row, fmt_date in zip(rows, formatted_dates):
-                cursor.execute(query, (
-                    row.get("Sede"), row.get("Ufficio"), row.get("Attivita"),
-                    row.get("Nome_Operatore"), row.get("ID_Operatore"), row.get("ID_attivita"),
-                    fmt_date, row.get("ID_Fascicolo"), row.get("Anno_fascicolo"),
-                    row.get("conta_pagine_giorno")
-                ))
-                count += 1
-            
-            cnx.commit()
-            cursor.close()
-            cnx.close()
-            return count
-        except Exception as e:
-            print(f"Errore inserimento batch: {e}")
-            cnx.close()
-            return 0
 
     @staticmethod
     def get_sedi() -> list[str]:
@@ -175,7 +142,7 @@ class DAO:
         """Ritorna lo schema della tabella come stringa (per AI)"""
         cnx = DBConnect.get_connection()
         if cnx is None:
-            return "Sede, Nome_Operatore, Data_Attivita, conta_pagine_giorno"
+            return "Sede, Nome_operatore, Data_Attivita, conta_pagine_giorno"
         try:
             cursor = cnx.cursor()
             cursor.execute(f"DESCRIBE {TABLE_NAME}")
@@ -184,7 +151,7 @@ class DAO:
             return ", ".join(cols)
         except Exception as e:
             print(f"[DB ERROR] {e}")
-            return "Sede, Nome_Operatore, Data_Attivita, conta_pagine_giorno"
+            return "Sede, Nome_operatore, Data_Attivita, conta_pagine_giorno"
         finally:
             cnx.close()
 
@@ -218,10 +185,10 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT Nome_Operatore as nome, SUM(conta_pagine_giorno) as totale
+            query = """SELECT Nome_operatore as nome, SUM(conta_pagine_giorno) as totale
                        FROM digitalizzazione
                        WHERE Attivita = 'Inserimento_Pagina'
-                       GROUP BY Nome_Operatore
+                       GROUP BY Nome_operatore
                        ORDER BY totale DESC
                        LIMIT %s"""
             cursor.execute(query, (limit,))
@@ -268,7 +235,7 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            # Query che gestisce sia DATE che stringhe formato dd/mm/yyyy
+
             query = """SELECT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese,
                         SUM(conta_pagine_giorno) as totale
                         FROM digitalizzazione
@@ -391,7 +358,7 @@ class DAO:
     def get_penali_operatori() -> list:
         """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno.
         Penale = (2400 - pagine_giorno) * 0.05 € per ogni giorno sotto il minimo.
-        Ritorna lista di dict con ID_Operatore, Nome_Operatore, giorni_penale, totale_penale."""
+        Ritorna lista di dict con ID_Operatore, Nome_operatore, giorni_penale, totale_penale."""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -404,14 +371,14 @@ class DAO:
             query = """
                 SELECT 
                     ID_Operatore,
-                    Nome_Operatore,
+                    Nome_operatore,
                     COUNT(*) as giorni_penale,
                     SUM(2400 - conta_pagine_giorno) as pagine_mancanti,
                     ROUND(SUM((2400 - conta_pagine_giorno) * 0.05), 2) as totale_penale
                 FROM digitalizzazione
                 WHERE ID_attivita = 1
                   AND conta_pagine_giorno < 2400
-                GROUP BY ID_Operatore, Nome_Operatore
+                GROUP BY ID_Operatore, Nome_operatore
                 HAVING totale_penale > 0
                 ORDER BY totale_penale DESC
             """
@@ -460,7 +427,7 @@ class DAO:
     @staticmethod
     def get_anomalie_attivita() -> list:
         """Trova operatori con più di una attività dello stesso tipo nella stessa data.
-        Ritorna lista di dict con ID_Operatore, Nome_Operatore, Data_Attivita, Attivita, conteggio."""
+        Ritorna lista di dict con ID_Operatore, Nome_operatore, Data_Attivita, Attivita, conteggio."""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -469,11 +436,11 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             query = """
-                SELECT  ID_Operatore,Nome_Operatore,Data_Attivita,Attivita,COUNT(*) as conteggio
+                SELECT  ID_Operatore,Nome_operatore,Data_Attivita,Attivita,COUNT(*) as conteggio
                 FROM digitalizzazione
-                GROUP BY ID_Operatore, Nome_Operatore, Data_Attivita, Attivita
+                GROUP BY ID_Operatore, Nome_operatore, Data_Attivita, Attivita
                 HAVING conteggio > 1
-                ORDER BY Data_Attivita DESC, Nome_Operatore
+                ORDER BY Data_Attivita DESC, Nome_operatore
             """
             cursor.execute(query)
             result = cursor.fetchall()
@@ -489,7 +456,7 @@ class DAO:
         """Calcola i pagamenti dovuti per ogni operatore nel mese specificato.
         Pagine prodotte = pagine inserite (ID_attivita=1) - pagine eliminate (ID_attivita=-1)
         Pagamento = pagine_prodotte * 0.139 €
-        Ritorna lista di dict con ID_Operatore, Nome_Operatore, pag_inserite, pag_eliminate, 
+        Ritorna lista di dict con ID_Operatore, Nome_operatore, pag_inserite, pag_eliminate, 
         pagine_nette, totale_pagamento."""
         cnx = DBConnect.get_connection()
         result = []
@@ -499,14 +466,14 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             query = """
-                SELECT ID_Operatore,Nome_Operatore,
+                SELECT ID_Operatore,Nome_operatore,
                     SUM(CASE WHEN ID_attivita = 1 THEN conta_pagine_giorno ELSE 0 END) as pag_inserite,
                     SUM(CASE WHEN ID_attivita = -1 THEN conta_pagine_giorno ELSE 0 END) as pag_eliminate,
                     SUM(conta_pagine_giorno * ID_attivita) as pagine_nette,
                     ROUND(SUM(conta_pagine_giorno * ID_attivita) * 0.139, 2) as totale_pagamento
                 FROM digitalizzazione
                 WHERE CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
-                GROUP BY ID_Operatore, Nome_Operatore
+                GROUP BY ID_Operatore, Nome_operatore
                 HAVING pagine_nette > 0
                 ORDER BY totale_pagamento DESC
             """
@@ -515,6 +482,63 @@ class DAO:
             cursor.close()
         except Exception as e:
             print(f"Errore get_pagamenti_operatori: {e}")
+        finally:
+            cnx.close()
+        return result
+
+
+
+    # ANALISI OPERATORI - Database Methods
+
+
+    @staticmethod
+    def get_operatori_multisettoriali() -> list:
+        """Operatori che hanno lavorato sia in Contabilita che in Personale."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Operatore, Nome_operatore
+                FROM digitalizzazione
+                WHERE Ufficio IN ('Contabilita', 'Personale')
+                GROUP BY ID_Operatore, Nome_operatore
+                HAVING COUNT(DISTINCT Ufficio) = 2
+                ORDER BY Nome_operatore
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_operatori_multisettoriali: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def get_operatori_esperti() -> list:
+        """Operatori che hanno lavorato in tutte le sedi del progetto.
+          La query gestisce il caso in cui il numero di sedi aumentino"""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Operatore, Nome_operatore
+                FROM digitalizzazione
+                GROUP BY ID_Operatore, Nome_operatore
+                HAVING COUNT(DISTINCT Sede) = (SELECT COUNT(DISTINCT Sede) FROM digitalizzazione)
+                ORDER BY Nome_operatore
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_operatori_esperti: {e}")
         finally:
             cnx.close()
         return result

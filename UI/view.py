@@ -51,6 +51,8 @@ class View(ft.UserControl):
         self.btn_penali = None
         self.btn_pagamenti = None
         self.btn_operatori = None
+        self.btn_multisettoriali = None
+        self.btn_esperti = None
         self.txt_result1 = None
         self.txt_result2 = None
         
@@ -214,6 +216,28 @@ class View(ft.UserControl):
             padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
         )
 
+        # Sezione Analisi Operatori
+        self.btn_multisettoriali = ft.ElevatedButton(
+            text="Multisettoriali", icon="swap_horiz",
+            on_click=self._controller.handle_operatori_multisettoriali if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=VIOLA, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+        self.btn_esperti = ft.ElevatedButton(
+            text="Esperti", icon="star",
+            on_click=self._controller.handle_operatori_esperti if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=ROSA, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        analisi_operatori_section = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="people", color=VIOLA, size=24),
+                        ft.Text("Analisi Operatori", size=18, weight="w600", color=TESTO_CHIARO)], spacing=10),
+                ft.Divider(height=20, color=BORDO),
+                ft.Row([self.btn_multisettoriali, self.btn_esperti], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+            ], spacing=10),
+            padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
+        )
+
         #sezione fascicoli
         self.dd_fascicolo = ft.Dropdown(
             label="Fascicolo", hint_text="Seleziona un fascicolo", width=400,
@@ -266,6 +290,7 @@ class View(ft.UserControl):
         return ft.Column([
             header, controls_section, ft.Container(height=15),
             pagamenti_section, ft.Container(height=15),
+            analisi_operatori_section, ft.Container(height=15),
             fascicolo_section, ft.Container(height=20),
             ft.Row([container1, container2], alignment=ft.MainAxisAlignment.CENTER, spacing=30),
         ], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO)
@@ -290,7 +315,7 @@ class View(ft.UserControl):
 
         for row in anomalie[:10]:
             self.txt_result2.controls.append(
-                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_Operatore']}", color=ARANCIO, size=12))
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}", color=ARANCIO, size=12))
             self.txt_result2.controls.append(
                 ft.Text(f"   Data: {row['Data_Attivita']} | {row['Attivita']} x{row['conteggio']}",
                         color=TESTO_SECONDARIO, size=11))
@@ -310,7 +335,7 @@ class View(ft.UserControl):
         # Dettaglio operatori
         for row in dati["operatori"]:
             self.txt_result2.controls.append(
-                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_Operatore']}",
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}",
                         weight=ft.FontWeight.BOLD, color=TESTO_CHIARO))
             self.txt_result2.controls.append(
                 ft.Text(

@@ -1,5 +1,5 @@
 import flet as ft
-from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO, CIANO
+from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO, CIANO, VIOLA, ROSA
 from model.modello import Model
 
 
@@ -129,7 +129,7 @@ class Controller:
             totale_complessivo = 0
             for row in penali:
                 id_op = row.get("ID_Operatore", "N/A")
-                nome = row.get("Nome_Operatore", "N/A")
+                nome = row.get("Nome_operatore", "N/A")
                 giorni = row.get("giorni_penale", 0)
                 pagine_mancanti = row.get("pagine_mancanti", 0)
                 penale = float(row.get("totale_penale", 0))
@@ -198,6 +198,43 @@ class Controller:
         self._view.update_page()
 
 
+    # ANALISI OPERATORI HANDLERS
+
+    def handle_operatori_multisettoriali(self, e):
+        """Mostra operatori che hanno lavorato sia in Contabilita che in Personale."""
+        self._view.txt_result2.controls.clear()
+        operatori = self._model.get_operatori_multisettoriali()
+        
+        self._view.txt_result2.controls.append(
+            ft.Text(f"OPERATORI MULTISETTORIALI ({len(operatori)})", weight=ft.FontWeight.BOLD, color=VIOLA))
+        self._view.txt_result2.controls.append(
+            ft.Text("Hanno lavorato sia in Contabilità che in Personale:", color=TESTO_SECONDARIO, size=12))
+        self._view.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+        
+        for row in operatori:
+            self._view.txt_result2.controls.append(
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}", color=TESTO_CHIARO))
+        
+        self._view.update_page()
+
+    def handle_operatori_esperti(self, e):
+        """Mostra operatori che hanno lavorato in tutte le sedi."""
+        self._view.txt_result2.controls.clear()
+        operatori = self._model.get_operatori_esperti()
+        
+        self._view.txt_result2.controls.append(
+            ft.Text(f"OPERATORI ESPERTI ({len(operatori)})", weight=ft.FontWeight.BOLD, color=ROSA))
+        self._view.txt_result2.controls.append(
+            ft.Text("Hanno lavorato in tutte le sedi del progetto:", color=TESTO_SECONDARIO, size=12))
+        self._view.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+        
+        for row in operatori:
+            self._view.txt_result2.controls.append(
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}", color=TESTO_CHIARO))
+        
+        self._view.update_page()
+
+
     # CSV IMPORT HANDLERS
     def handle_file_pick(self, e):
         """Apre il FilePicker per selezionare il file CSV."""
@@ -222,27 +259,18 @@ class Controller:
             return
 
         try:
-            self._view.csv_status.value = "Caricamento file..."
-            self._view.csv_progress.value = 0
+            self._view.csv_status.value = "Importazione in corso..."
             self._view.update_page()
 
             # Carica il CSV nel modello
-            total = self._model.load_csv_file(self._selected_file_path)
-            
-            self._view.csv_status.value = "Connessione al database..."
-            self._view.update_page()
+            self._model.load_csv_file(self._selected_file_path)
 
             # Importa riga per riga
             rows = self._model.get_csv_rows()
-            for i, row in enumerate(rows):
+            for i in range(len(rows)):
                 self._model.import_csv_row(i)
-                if i % 100 == 0:
-                    self._view.csv_progress.value = (i + 1) / total
-                    self._view.csv_status.value = f"Importazione: {i + 1}/{total}..."
-                    self._view.update_page()
 
-            self._view.csv_status.value = f"Successo! {total} record inseriti."
-            self._view.csv_progress.value = 1
+            self._view.csv_status.value = f"Completato: record inserito."
             self._model.clear_csv_data()
             self._view.update_page()
 
