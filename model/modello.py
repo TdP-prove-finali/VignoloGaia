@@ -260,10 +260,10 @@ class Model:
 
     # PENALI LOGIC
 
-    def get_penali_operatori(self) -> list:
-        """Ritorna la lista degli operatori con penali.
+    def get_penali_operatori(self, mese: str) -> list:
+        """Ritorna la lista degli operatori con penali nel mese specificato.
         Ogni elemento contiene: ID_Operatore, Nome_operatore, giorni_penale, totale_penale."""
-        return DAO.get_penali_operatori()
+        return DAO.get_penali_operatori(mese)
 
 
     # PAGAMENTI LOGIC
@@ -289,6 +289,18 @@ class Model:
         return {
             "operatori": pagamenti,
             "totale_pagine": totale_pagine,
+            "totale_euro": totale_euro
+        }
+
+    def get_indennita_trasferta(self, mese: str) -> dict:
+        """Ritorna le indennità di trasferta con totali calcolati."""
+        indennita = DAO.get_indennita_trasferta(mese)
+        totale_giorni = sum(int(row.get("giorni_trasferta", 0)) for row in indennita)
+        totale_euro = sum(float(row.get("totale_indennita", 0)) for row in indennita)
+        
+        return {
+            "operatori": indennita,
+            "totale_giorni": totale_giorni,
             "totale_euro": totale_euro
         }
 

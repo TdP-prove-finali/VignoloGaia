@@ -1,5 +1,5 @@
 import flet as ft
-from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO, CIANO, VIOLA, ROSA
+from UI.view import View, VERDE, ARANCIO, ROSSO, TESTO_CHIARO, TESTO_SECONDARIO, BORDO, CIANO, VIOLA, ROSA, LIME
 from model.modello import Model
 
 
@@ -108,21 +108,27 @@ class Controller:
 
     # PENALI HANDLER
     def handle_calcola_penali(self, e):
-        """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno."""
+        """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno nel mese selezionato."""
         self._view.txt_result2.controls.clear()
         
+        if not self._view.dd_mese.value:
+            self._view.create_alert("Selezionare un mese!")
+            return
+        
+        mese = self._view.dd_mese.value
+        
         try:
-            penali = self._model.get_penali_operatori()
+            penali = self._model.get_penali_operatori(mese)
             
             if not penali:
                 self._view.txt_result2.controls.append(
-                    ft.Text("Nessuna penale rilevata.", weight=ft.FontWeight.BOLD, color=VERDE))
+                    ft.Text(f"Nessuna penale rilevata per {mese}.", weight=ft.FontWeight.BOLD, color=VERDE))
                 self._view.update_page()
                 return
             
 
             self._view.txt_result2.controls.append(
-                ft.Text(" PENALI OPERATORI (min. 2400 pag/giorno, 0.05€/pag)",
+                ft.Text(f" PENALI {mese} (min. 2400 pag/giorno, 0.05€/pag)",
                         weight=ft.FontWeight.BOLD, color=ARANCIO))
             self._view.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
             
@@ -191,6 +197,32 @@ class Controller:
                 return
 
             self._view.mostra_pagamenti(mese, dati)
+            
+        except Exception as ex:
+            self._view.txt_result2.controls.append(ft.Text(f"Errore: {ex}", color=ROSSO))
+        
+        self._view.update_page()
+
+    def handle_indennita_trasferta(self, e):
+        """Calcola le indennità di trasferta per gli operatori nel mese selezionato."""
+        self._view.txt_result2.controls.clear()
+        
+        if not self._view.dd_mese.value:
+            self._view.create_alert("Selezionare un mese!")
+            return
+        
+        mese = self._view.dd_mese.value
+        
+        try:
+            dati = self._model.get_indennita_trasferta(mese)
+            
+            if not dati["operatori"]:
+                self._view.txt_result2.controls.append(
+                    ft.Text(f"Nessuna indennità trasferta per {mese}.", weight=ft.FontWeight.BOLD, color=TESTO_SECONDARIO))
+                self._view.update_page()
+                return
+
+            self._view.mostra_indennita_trasferta(mese, dati)
             
         except Exception as ex:
             self._view.txt_result2.controls.append(ft.Text(f"Errore: {ex}", color=ROSSO))
@@ -270,7 +302,7 @@ class Controller:
             for i in range(len(rows)):
                 self._model.import_csv_row(i)
 
-            self._view.csv_status.value = f"Completato: record inserito."
+            self._view.csv_status.value = "Completato: record inseriti."
             self._model.clear_csv_data()
             self._view.update_page()
 

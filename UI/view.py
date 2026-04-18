@@ -50,6 +50,7 @@ class View(ft.UserControl):
         self.btn_stats = None
         self.btn_penali = None
         self.btn_pagamenti = None
+        self.btn_indennita = None
         self.btn_operatori = None
         self.btn_multisettoriali = None
         self.btn_esperti = None
@@ -171,12 +172,6 @@ class View(ft.UserControl):
             on_click=self._controller.handle_stats if self._controller else None,
             style=ft.ButtonStyle(bgcolor=VERDE, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
         )
-        
-        self.btn_penali = ft.ElevatedButton(
-            text="Calcola Penali", icon="warning",
-            on_click=self._controller.handle_calcola_penali if self._controller else None,
-            style=ft.ButtonStyle(bgcolor=ARANCIO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
-        )
 
         controls_section = ft.Container(
             content=ft.Column([
@@ -185,7 +180,7 @@ class View(ft.UserControl):
                 ft.Divider(height=20, color=BORDO),
                 ft.Row([self.dd_sede], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Container(height=15),
-                ft.Row([self.btn_graph, self.btn_stats, self.btn_penali], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+                ft.Row([self.btn_graph, self.btn_stats], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
             ], spacing=10),
             padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
         )
@@ -206,12 +201,24 @@ class View(ft.UserControl):
             style=ft.ButtonStyle(bgcolor=CIANO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
         )
 
+        self.btn_indennita = ft.ElevatedButton(
+            text="Indennità Trasferta", icon="directions_car",
+            on_click=self._controller.handle_indennita_trasferta if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=LIME, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        self.btn_penali = ft.ElevatedButton(
+            text="Calcola Penali", icon="warning",
+            on_click=self._controller.handle_calcola_penali if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=ARANCIO, color="white", padding=20, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
         pagamenti_section = ft.Container(
             content=ft.Column([
                 ft.Row([ft.Icon(name="euro", color=CIANO, size=24),
                         ft.Text("Calcolo Pagamenti", size=18, weight="w600", color=TESTO_CHIARO)], spacing=10),
                 ft.Divider(height=20, color=BORDO),
-                ft.Row([self.dd_mese, self.btn_pagamenti], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+                ft.Row([self.dd_mese, self.btn_pagamenti, self.btn_indennita, self.btn_penali], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
             ], spacing=10),
             padding=30, bgcolor=BLU_SCURO_ALPHA, border_radius=20, border=ft.border.all(1, BORDO),
         )
@@ -309,7 +316,7 @@ class View(ft.UserControl):
         self.txt_result2.controls.append(
             ft.Text("ANOMALIE RILEVATE", weight=ft.FontWeight.BOLD, color=ROSSO))
         self.txt_result2.controls.append(
-            ft.Text("Operatori con più attività dello stesso tipo nella stessa data:",
+            ft.Text("Operatori con più attività dello stesso tipo nella stessa data e sede:",
                     color=TESTO_SECONDARIO, size=12))
         self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
 
@@ -317,7 +324,7 @@ class View(ft.UserControl):
             self.txt_result2.controls.append(
                 ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}", color=ARANCIO, size=12))
             self.txt_result2.controls.append(
-                ft.Text(f"   Data: {row['Data_Attivita']} | {row['Attivita']} x{row['conteggio']}",
+                ft.Text(f"   Data: {row['Data_Attivita']} | {row['Sede']} | {row['Attivita']} x{row['conteggio']}",
                         color=TESTO_SECONDARIO, size=11))
 
         if len(anomalie) > 10:
@@ -350,6 +357,31 @@ class View(ft.UserControl):
         self.txt_result2.controls.append(
             ft.Text(f"TOTALE: {self._fmt_num(dati['totale_pagine'])} pag -> € {self._fmt_euro(dati['totale_euro'])}",
                     weight=ft.FontWeight.BOLD, size=16, color=VERDE))
+
+    def mostra_indennita_trasferta(self, mese: str, dati: dict):
+        """Visualizza le indennità di trasferta nella ListView."""
+        self.txt_result2.controls.append(
+            ft.Text(f"INDENNITÀ TRASFERTA {mese} (83,40 €/giorno)", weight=ft.FontWeight.BOLD, color=LIME))
+        self.txt_result2.controls.append(
+            ft.Text("Operatori che hanno lavorato in sedi diverse nello stesso giorno:",
+                    color=TESTO_SECONDARIO, size=12))
+        self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+
+        for row in dati["operatori"]:
+            self.txt_result2.controls.append(
+                ft.Text(f"ID: {row['ID_Operatore']} | {row['Nome_operatore']}",
+                        weight=ft.FontWeight.BOLD, color=TESTO_CHIARO))
+            self.txt_result2.controls.append(
+                ft.Text(f"   Giorni trasferta: {row['giorni_trasferta']}", color=TESTO_SECONDARIO))
+            self.txt_result2.controls.append(
+                ft.Text(f"   Indennità: € {self._fmt_euro(row['totale_indennita'])}", color=LIME))
+            self.txt_result2.controls.append(ft.Container(height=5))
+
+        # Totali
+        self.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
+        self.txt_result2.controls.append(
+            ft.Text(f"TOTALE: {dati['totale_giorni']} giorni -> € {self._fmt_euro(dati['totale_euro'])}",
+                    weight=ft.FontWeight.BOLD, size=16, color=LIME))
 
 
     # PAGINA 2: UPLOAD CSV

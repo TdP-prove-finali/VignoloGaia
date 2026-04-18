@@ -3,7 +3,7 @@ from model.operatore import Operatore
 from model.fascicolo import Fascicolo
 
 #variabile globale che rappresenta il nome della tabella utilizzata nelle query
-TABLE_NAME = "digitalizzazione_test"
+TABLE_NAME = "digitalizzazione"
 
 
 class DAO:
@@ -235,7 +235,7 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-
+            # Query che gestisce sia DATE che stringhe formato dd/mm/yyyy
             query = """SELECT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese,
                         SUM(conta_pagine_giorno) as totale
                         FROM digitalizzazione
@@ -355,8 +355,8 @@ class DAO:
     COSTO_PENALE_PAGINA = 0.05
 
     @staticmethod
-    def get_penali_operatori() -> list:
-        """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno.
+    def get_penali_operatori(mese: str) -> list:
+        """Calcola le penali per gli operatori sotto il minimo di 2400 pagine/giorno nel mese specificato.
         Penale = (2400 - pagine_giorno) * 0.05 € per ogni giorno sotto il minimo.
         Ritorna lista di dict con ID_Operatore, Nome_operatore, giorni_penale, totale_penale."""
         cnx = DBConnect.get_connection()
@@ -366,8 +366,6 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            # Query che calcola le penali per ogni operatore
-            # ID_attivita = 1 significa scansione pagine
             query = """
                 SELECT 
                     ID_Operatore,
@@ -378,11 +376,12 @@ class DAO:
                 FROM digitalizzazione
                 WHERE ID_attivita = 1
                   AND conta_pagine_giorno < 2400
+                  AND CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
                 GROUP BY ID_Operatore, Nome_operatore
                 HAVING totale_penale > 0
                 ORDER BY totale_penale DESC
             """
-            cursor.execute(query)
+            cursor.execute(query, (mese,))
             result = cursor.fetchall()
             cursor.close()
         except Exception as e:
@@ -426,8 +425,8 @@ class DAO:
 
     @staticmethod
     def get_anomalie_attivita() -> list:
-        """Trova operatori con più di una attività dello stesso tipo nella stessa data.
-        Ritorna lista di dict con ID_Operatore, Nome_operatore, Data_Attivita, Attivita, conteggio."""
+        """Trova operatori con più di una attività dello stesso tipo nella stessa data e sede.
+        Ritorna lista di dict con ID_Operatore, Nome_operatore, Data_Attivita, Attivita, Sede, conteggio."""
         cnx = DBConnect.get_connection()
         result = []
         if cnx is None:
@@ -436,9 +435,9 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             query = """
-                SELECT  ID_Operatore,Nome_operatore,Data_Attivita,Attivita,COUNT(*) as conteggio
+                SELECT ID_Operatore, Nome_operatore, Data_Attivita, Attivita, Sede, COUNT(*) as conteggio
                 FROM digitalizzazione
-                GROUP BY ID_Operatore, Nome_operatore, Data_Attivita, Attivita
+                GROUP BY ID_Operatore, Nome_operatore, Data_Attivita, Attivita, Sede
                 HAVING conteggio > 1
                 ORDER BY Data_Attivita DESC, Nome_operatore
             """
@@ -447,6 +446,45 @@ class DAO:
             cursor.close()
         except Exception as e:
             print(f"Errore get_anomalie_attivita: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    # Costanti per il calcolo indennità trasferta
+    INDENNITA_TRASFERTA = (2400 / 4) * 0.139  # 83.4 €
+
+    @staticmethod
+    def get_indennita_trasferta(mese: str) -> list:
+        """Trova operatori che hanno lavorato in sedi diverse nello stesso giorno.
+        Indennità = (2400/4) * 0.139 € per ogni giorno di trasferta.
+        Ritorna lista di dict con ID_Operatore, Nome_operatore, giorni_trasferta, totale_indennita."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            print("Connessione fallita")
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Operatore, Nome_operatore, COUNT(DISTINCT Data_Attivita) as giorni_trasferta
+                FROM (
+                    SELECT ID_Operatore, Nome_operatore, Data_Attivita
+                    FROM digitalizzazione
+                    WHERE CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
+                    GROUP BY ID_Operatore, Nome_operatore, Data_Attivita
+                    HAVING COUNT(DISTINCT Sede) > 1
+                ) as trasferte
+                GROUP BY ID_Operatore, Nome_operatore
+                ORDER BY giorni_trasferta DESC
+            """
+            cursor.execute(query, (mese,))
+            rows = cursor.fetchall()
+            for row in rows:
+                row['totale_indennita'] = round(row['giorni_trasferta'] * DAO.INDENNITA_TRASFERTA, 2)
+            result = rows
+            cursor.close()
+        except Exception as e:
+            print(f"Errore get_indennita_trasferta: {e}")
         finally:
             cnx.close()
         return result
