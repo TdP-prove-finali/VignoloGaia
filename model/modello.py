@@ -305,6 +305,7 @@ class Model:
         }
 
 
+
     # ANALISI OPERATORI LOGIC
 
     def get_operatori_multisettoriali(self) -> list:
@@ -314,3 +315,15 @@ class Model:
     def get_operatori_esperti(self) -> list:
         """Operatori che hanno lavorato in tutte le sedi del progetto."""
         return DAO.get_operatori_esperti()
+
+
+    # CONTROLLI UNIVOCITÀ LOGIC
+
+    def get_controlli_univocita(self) -> dict:
+        """Esegue tutti i controlli di univocità e ritorna i risultati raggruppati."""
+        return {
+            "fascicolo_per_anno": DAO.check_fascicolo_univoco_per_anno(),
+            "operatore_univoco": DAO.check_operatore_univoco(),
+            "attivita_coerente": DAO.check_attivita_coerente(),
+            "fascicolo_sede_univoca": DAO.check_fascicolo_sede_univoca(),
+        }

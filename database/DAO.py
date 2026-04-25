@@ -566,12 +566,12 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             query = """
-                SELECT ID_Operatore, Nome_operatore
-                FROM digitalizzazione
-                GROUP BY ID_Operatore, Nome_operatore
-                HAVING COUNT(DISTINCT Sede) = (SELECT COUNT(DISTINCT Sede) FROM digitalizzazione)
-                ORDER BY Nome_operatore
-            """
+                    SELECT ID_Operatore, Nome_operatore
+                    FROM digitalizzazione
+                    GROUP BY ID_Operatore, Nome_operatore
+                    HAVING COUNT(DISTINCT Sede) = (SELECT COUNT(DISTINCT Sede) FROM digitalizzazione)
+                    ORDER BY Nome_operatore \
+                    """
             cursor.execute(query)
             result = cursor.fetchall()
             cursor.close()
@@ -580,3 +580,127 @@ class DAO:
         finally:
             cnx.close()
         return result
+
+
+    # CONTROLLI UNIVOCITÀ - Database Methods
+
+
+    @staticmethod
+    def check_fascicolo_univoco_per_anno() -> list:
+        """Verifica che ogni ID_Fascicolo sia associato a un solo Anno_fascicolo
+        globalmente (indipendentemente dalla sede)."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Fascicolo,
+                       COUNT(DISTINCT Anno_fascicolo) AS anni_distinti,
+                       GROUP_CONCAT(DISTINCT Anno_fascicolo ORDER BY Anno_fascicolo) AS anni
+                FROM digitalizzazione
+                GROUP BY ID_Fascicolo
+                HAVING anni_distinti > 1
+                ORDER BY ID_Fascicolo
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore check_fascicolo_univoco_per_anno: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def check_operatore_univoco() -> list:
+        """Verifica che Nome_operatore e ID_Operatore siano univoci:
+        stesso ID non può avere nomi diversi e stesso nome non può avere ID diversi."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT 'ID con più nomi' AS tipo,
+                       CAST(ID_Operatore AS CHAR) AS identificatore,
+                       GROUP_CONCAT(DISTINCT Nome_operatore ORDER BY Nome_operatore) AS valori
+                FROM digitalizzazione
+                GROUP BY ID_Operatore
+                HAVING COUNT(DISTINCT Nome_operatore) > 1
+                UNION ALL
+                SELECT 'Nome con più ID',
+                       Nome_operatore,
+                       GROUP_CONCAT(DISTINCT ID_Operatore ORDER BY ID_Operatore)
+                FROM digitalizzazione
+                GROUP BY Nome_operatore
+                HAVING COUNT(DISTINCT ID_Operatore) > 1
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore check_operatore_univoco: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def check_attivita_coerente() -> list:
+        """Verifica che ID_attivita=1 corrisponda ad Inserimento_Pagina
+        e ID_attivita=-1 corrisponda ad Eliminazione_pagina (case insensitive)."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_attivita, Attivita, COUNT(*) AS occorrenze
+                FROM digitalizzazione
+                WHERE NOT (
+                    (ID_attivita = 1  AND LOWER(Attivita) = 'inserimento_pagina') OR
+                    (ID_attivita = -1 AND LOWER(Attivita) = 'eliminazione_pagina')
+                )
+                GROUP BY ID_attivita, Attivita
+                ORDER BY ID_attivita
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore check_attivita_coerente: {e}")
+        finally:
+            cnx.close()
+        return result
+
+    @staticmethod
+    def check_fascicolo_sede_univoca() -> list:
+        """Verifica che ogni ID_Fascicolo sia presente in una sola sede."""
+        cnx = DBConnect.get_connection()
+        result = []
+        if cnx is None:
+            return result
+        try:
+            cursor = cnx.cursor(dictionary=True)
+            query = """
+                SELECT ID_Fascicolo,
+                       COUNT(DISTINCT Sede) AS num_sedi,
+                       GROUP_CONCAT(DISTINCT Sede ORDER BY Sede) AS sedi
+                FROM digitalizzazione
+                GROUP BY ID_Fascicolo
+                HAVING num_sedi > 1
+                ORDER BY ID_Fascicolo
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            print(f"Errore check_fascicolo_sede_univoca: {e}")
+        finally:
+            cnx.close()
+        return result
+
+

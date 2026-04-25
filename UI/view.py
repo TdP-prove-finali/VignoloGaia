@@ -76,6 +76,10 @@ class View(ft.UserControl):
         self.ai_status_text = None
         self.ai_progress = None
         
+        # Controlli Univocità controls
+        self.btn_controlli = None
+        self.controlli_results = None
+
         # Grafici controls
         self.chart_selector = None
         self.chart_container = None
@@ -107,6 +111,7 @@ class View(ft.UserControl):
                 ft.NavigationRailDestination(icon=ft.icons.UPLOAD_FILE_OUTLINED, selected_icon=ft.icons.UPLOAD_FILE, label="Upload CSV", padding=10),
                 ft.NavigationRailDestination(icon=ft.icons.SMART_TOY_OUTLINED, selected_icon=ft.icons.SMART_TOY, label="AI Assistant", padding=10),
                 ft.NavigationRailDestination(icon=ft.icons.BAR_CHART_OUTLINED, selected_icon=ft.icons.BAR_CHART, label="Grafici", padding=10),
+                ft.NavigationRailDestination(icon=ft.icons.VERIFIED_OUTLINED, selected_icon=ft.icons.VERIFIED, label="Controlli", padding=10),
             ],
         )
 
@@ -136,7 +141,7 @@ class View(ft.UserControl):
         self._page.update()
 
     def _on_nav_change(self, e):
-        pages = [self._build_home_page, self._build_upload_csv_page, self._build_ai_assistant_page, self._build_grafici_page]
+        pages = [self._build_home_page, self._build_upload_csv_page, self._build_ai_assistant_page, self._build_grafici_page, self._build_controlli_page]
         self.content_area.content = pages[e.control.selected_index]()
         self._page.update()
 
@@ -676,6 +681,59 @@ class View(ft.UserControl):
         self.stat_card_operatori.data["value_text"].value = fmt(stats.get("operatori", 0))
         self.stat_card_fascicoli.data["value_text"].value = fmt(stats.get("fascicoli", 0))
         self.stat_card_media.data["value_text"].value = fmt(stats.get("media_giorno", 0))
+
+
+    # PAGINA 5: CONTROLLI UNIVOCITÀ
+
+    def _build_controlli_page(self):
+        header = ft.Container(
+            content=ft.Column([
+                ft.Text("Controlli Univocità", size=36, weight="bold", color=TESTO_CHIARO),
+                ft.Text("Verifica della consistenza degli identificativi gestionali", color=TESTO_SECONDARIO, size=14),
+            ], horizontal_alignment="center", spacing=5),
+            padding=ft.padding.only(bottom=20)
+        )
+
+        self.btn_controlli = ft.ElevatedButton(
+            text="Esegui Controlli", icon="verified",
+            on_click=self._controller.handle_esegui_controlli if self._controller else None,
+            style=ft.ButtonStyle(bgcolor=CIANO, color="white", padding=24, shape=ft.RoundedRectangleBorder(radius=12))
+        )
+
+        info_checks = ft.Container(
+            content=ft.Column([
+                ft.Text("Controlli eseguiti:", weight=ft.FontWeight.BOLD, color=TESTO_CHIARO),
+                ft.Text("1. ID_Fascicolo univoco per Anno di riferimento (globalmente)", color=TESTO_SECONDARIO, size=12),
+                ft.Text("2. Nome_operatore e ID_Operatore univoci (stessa coppia ovunque)", color=TESTO_SECONDARIO, size=12),
+                ft.Text("3. Coerenza ID_attivita / Attivita (case insensitive)", color=TESTO_SECONDARIO, size=12),
+                ft.Text("4. Ogni ID_Fascicolo presente in una sola Sede", color=TESTO_SECONDARIO, size=12),
+            ], spacing=6),
+            padding=20, bgcolor=BLU_SCURO_ALPHA, border_radius=16, border=ft.border.all(1, BORDO)
+        )
+
+        self.controlli_results = ft.ListView(expand=1, spacing=4, padding=15, auto_scroll=False)
+        self.controlli_results.controls.append(
+            ft.Text("Premi 'Esegui Controlli' per avviare la verifica.", color=TESTO_SECONDARIO, size=14, italic=True))
+
+        results_container = ft.Container(
+            content=ft.Column([
+                ft.Row([ft.Icon(name="verified", color=CIANO, size=20),
+                        ft.Text("Risultati", weight="w600", color=TESTO_CHIARO, size=16)], spacing=8),
+                ft.Divider(height=15, color=BORDO),
+                ft.Container(content=self.controlli_results, expand=True),
+            ]),
+            padding=20, bgcolor=BLU_SCURO, border_radius=16, border=ft.border.all(1, BORDO),
+            height=480, width=870,
+        )
+
+        return ft.Column([
+            header,
+            ft.Row([self.btn_controlli], alignment=ft.MainAxisAlignment.CENTER),
+            ft.Container(height=15),
+            info_checks,
+            ft.Container(height=15),
+            results_container,
+        ], horizontal_alignment="center", spacing=0, scroll=ft.ScrollMode.AUTO)
 
 
     # UTILITY METHODS

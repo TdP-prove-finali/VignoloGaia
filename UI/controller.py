@@ -238,7 +238,7 @@ class Controller:
         operatori = self._model.get_operatori_multisettoriali()
         
         self._view.txt_result2.controls.append(
-            ft.Text(f"OPERATORI MULTISETTORIALI ({len(operatori)})", weight=ft.FontWeight.BOLD, color=VIOLA))
+            ft.Text(f"🔀 OPERATORI MULTISETTORIALI ({len(operatori)})", weight=ft.FontWeight.BOLD, color=VIOLA))
         self._view.txt_result2.controls.append(
             ft.Text("Hanno lavorato sia in Contabilità che in Personale:", color=TESTO_SECONDARIO, size=12))
         self._view.txt_result2.controls.append(ft.Divider(height=10, color=BORDO))
@@ -309,6 +309,7 @@ class Controller:
         except Exception as ex:
             self._view.csv_status.value = f"Errore: {ex}"
             self._view.update_page()
+
 
 
     # AI ASSISTANT HANDLERS
@@ -416,3 +417,62 @@ class Controller:
             
         except Exception as ex:
             self._view.create_alert(f"Errore: {ex}")
+
+
+    # CONTROLLI UNIVOCITÀ HANDLERS
+
+    def handle_esegui_controlli(self, e):
+        """Esegue tutti i controlli di univocità e mostra i risultati."""
+        self._view.controlli_results.controls.clear()
+
+        try:
+            risultati = self._model.get_controlli_univocita()
+            self._render_controllo(
+                "1. ID_Fascicolo univoco per Anno di riferimento",
+                "Fascicoli associati a più Anno_fascicolo:",
+                risultati["fascicolo_per_anno"],
+                lambda r: f"Fascicolo: {r['ID_Fascicolo']} | Anni: {r['anni']}"
+            )
+            self._render_controllo(
+                "2. Nome_operatore e ID_Operatore univoci",
+                "Operatori con identificativi incoerenti:",
+                risultati["operatore_univoco"],
+                lambda r: f"[{r['tipo']}] {r['identificatore']} -> {r['valori']}"
+            )
+            self._render_controllo(
+                "3. Coerenza ID_attivita / Attivita",
+                "Righe in cui il codice attività non corrisponde al nome (case insensitive):",
+                risultati["attivita_coerente"],
+                lambda r: f"ID_attivita: {r['ID_attivita']} | Attivita: '{r['Attivita']}' | Occorrenze: {r['occorrenze']}"
+            )
+            self._render_controllo(
+                "4. Ogni ID_Fascicolo presente in una sola Sede",
+                "Fascicoli presenti in più sedi:",
+                risultati["fascicolo_sede_univoca"],
+                lambda r: f"Fascicolo: {r['ID_Fascicolo']} | Sedi: {r['sedi']}"
+            )
+
+        except Exception as ex:
+            self._view.controlli_results.controls.append(
+                ft.Text(f"Errore: {ex}", color=ROSSO))
+
+        self._view.update_page()
+
+    def _render_controllo(self, titolo: str, sottotitolo: str, anomalie: list, fmt):
+        """Metodo helper: aggiunge un blocco di controllo nella ListView."""
+        v = self._view
+        colore_titolo = ROSSO if anomalie else VERDE
+        icona = "✗" if anomalie else "✓"
+        v.controlli_results.controls.append(
+            ft.Text(f"{icona} {titolo}", weight=ft.FontWeight.BOLD, color=colore_titolo, size=14))
+        if anomalie:
+            v.controlli_results.controls.append(
+                ft.Text(sottotitolo, color=TESTO_SECONDARIO, size=12))
+            for r in anomalie:
+                v.controlli_results.controls.append(
+                    ft.Text(f"   • {fmt(r)}", color=ARANCIO, size=12))
+        else:
+            v.controlli_results.controls.append(
+                ft.Text("   Nessuna anomalia rilevata.", color=TESTO_SECONDARIO, size=12))
+        v.controlli_results.controls.append(ft.Divider(height=12, color=BORDO))
+
