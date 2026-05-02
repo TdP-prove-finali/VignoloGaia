@@ -5,12 +5,9 @@ import openai
 import groq
 from datetime import datetime
 
-from database.DAO import DAO
+from database.DAO import DAO, TABLE_NAME
 from model.operatore import Operatore
 from model.fascicolo import Fascicolo
-
-#variabile globale che rappresenta il nome della tabella utilizzata dall' AI assistant
-TABLE_NAME = "digitalizzazione"
 
 
 class Model:
@@ -149,6 +146,32 @@ class Model:
     def get_csv_rows(self) -> list:
         """Ritorna le righe CSV caricate."""
         return self._csv_rows
+
+    def validate_csv(self) -> dict:
+        """Valida le righe CSV in memoria. Ritorna dict con anomalie per categoria
+        (ufficio, sede, data). Ogni anomalia è una tupla (numero_riga_csv, valore)."""
+        sedi_valide = {'sede3', 'sede6', 'sede8', 'sede9', 'sede13', 'sede16'}
+        uffici_validi = {'contabilita', 'contabilità', 'personale'}
+        errori = {"ufficio": [], "sede": [], "data": []}
+
+        for i, row in enumerate(self._csv_rows, start=2):  # start=2: la riga 1 è l'header
+            ufficio = (row.get("Ufficio") or "").strip()
+            if ufficio.lower() not in uffici_validi:
+                errori["ufficio"].append((i, ufficio))
+
+            sede = (row.get("Sede") or "").strip()
+            if sede not in sedi_valide:
+                errori["sede"].append((i, sede))
+
+            data = (row.get("Data_Attivita") or "").strip()
+            try:
+                d = datetime.strptime(data, "%d/%m/%Y")
+                if d < datetime(2025, 10, 1):
+                    errori["data"].append((i, data))
+            except (ValueError, TypeError):
+                errori["data"].append((i, data))
+
+        return errori
 
 
     def _to_int(self, value) -> int | None:

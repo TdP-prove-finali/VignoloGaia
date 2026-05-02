@@ -1,9 +1,13 @@
+import os
+from dotenv import load_dotenv
+
 from database.DB_connect import DBConnect
 from model.operatore import Operatore
 from model.fascicolo import Fascicolo
 
-#variabile globale che rappresenta il nome della tabella utilizzata nelle query
-TABLE_NAME = "digitalizzazione"
+load_dotenv()
+#variabile letta da .env: rappresenta il nome della tabella utilizzata nelle query
+TABLE_NAME = os.environ.get("TABLE_NAME", "digitalizzazione")
 
 
 class DAO:
@@ -46,8 +50,8 @@ class DAO:
             print("Connessione fallita")
         else:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT DISTINCT Sede
-                       FROM digitalizzazione
+            query = f"""SELECT DISTINCT Sede
+                       FROM {TABLE_NAME}
                        ORDER BY Sede ASC"""
             cursor.execute(query)
 
@@ -67,8 +71,8 @@ class DAO:
             print("Connessione fallita")
         else:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT DISTINCT ID_operatore, Nome_operatore, Sede, Ufficio
-                       FROM digitalizzazione
+            query = f"""SELECT DISTINCT ID_operatore, Nome_operatore, Sede, Ufficio
+                       FROM {TABLE_NAME}
                        WHERE Sede = %s"""
             cursor.execute(query, (sede,))
 
@@ -93,8 +97,8 @@ class DAO:
             print("Connessione fallita")
         else:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT DISTINCT ID_fascicolo, Anno_fascicolo, Ufficio
-                       FROM digitalizzazione
+            query = f"""SELECT DISTINCT ID_fascicolo, Anno_fascicolo, Ufficio
+                       FROM {TABLE_NAME}
                        WHERE Sede = %s"""
             cursor.execute(query, (sede,))
 
@@ -119,9 +123,9 @@ class DAO:
             print("Connessione fallita")
         else:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT ID_operatore, ID_fascicolo,
+            query = f"""SELECT ID_operatore, ID_fascicolo,
                               SUM(conta_pagine_giorno) AS tot_pagine
-                       FROM digitalizzazione
+                       FROM {TABLE_NAME}
                        WHERE Sede = %s
                          AND Attivita = 'Inserimento_Pagina'
                        GROUP BY ID_operatore, ID_fascicolo"""
@@ -185,8 +189,8 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT Nome_operatore as nome, SUM(conta_pagine_giorno) as totale
-                       FROM digitalizzazione
+            query = f"""SELECT Nome_operatore as nome, SUM(conta_pagine_giorno) as totale
+                       FROM {TABLE_NAME}
                        WHERE Attivita = 'Inserimento_Pagina'
                        GROUP BY Nome_operatore
                        ORDER BY totale DESC
@@ -210,8 +214,8 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT Sede as nome, SUM(conta_pagine_giorno) as totale
-                       FROM digitalizzazione
+            query = f"""SELECT Sede as nome, SUM(conta_pagine_giorno) as totale
+                       FROM {TABLE_NAME}
                        WHERE Attivita = 'Inserimento_Pagina'
                        GROUP BY Sede
                        ORDER BY totale DESC"""
@@ -236,9 +240,9 @@ class DAO:
         try:
             cursor = cnx.cursor(dictionary=True)
             # Query che gestisce sia DATE che stringhe formato dd/mm/yyyy
-            query = """SELECT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese,
+            query = f"""SELECT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese,
                         SUM(conta_pagine_giorno) as totale
-                        FROM digitalizzazione
+                        FROM {TABLE_NAME}
                         WHERE Attivita = 'Inserimento_Pagina'
                         AND Data_Attivita IS NOT NULL
                         AND Data_Attivita != ''
@@ -263,8 +267,8 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT Ufficio as nome, SUM(conta_pagine_giorno) as totale
-                       FROM digitalizzazione
+            query = f"""SELECT Ufficio as nome, SUM(conta_pagine_giorno) as totale
+                       FROM {TABLE_NAME}
                        WHERE Attivita = 'Inserimento_Pagina'
                        GROUP BY Ufficio
                        ORDER BY totale DESC"""
@@ -287,9 +291,9 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """SELECT CONCAT('Fasc. ', ID_Fascicolo) as nome, 
+            query = f"""SELECT CONCAT('Fasc. ', ID_Fascicolo) as nome, 
                               SUM(conta_pagine_giorno) as totale
-                       FROM digitalizzazione
+                       FROM {TABLE_NAME}
                        WHERE Attivita = 'Inserimento_Pagina'
                        GROUP BY ID_Fascicolo
                        ORDER BY totale DESC
@@ -315,26 +319,26 @@ class DAO:
             cursor = cnx.cursor(dictionary=True)
             
             # Totale pagine
-            cursor.execute("""SELECT SUM(conta_pagine_giorno) as tot 
-                             FROM digitalizzazione 
+            cursor.execute(f"""SELECT SUM(conta_pagine_giorno) as tot 
+                             FROM {TABLE_NAME} 
                              WHERE Attivita = 'Inserimento_Pagina'""")
             row = cursor.fetchone()
             result["totale_pagine"] = int(row["tot"]) if row and row["tot"] else 0
             
             # Operatori unici
-            cursor.execute("""SELECT COUNT(DISTINCT ID_Operatore) as tot FROM digitalizzazione""")
+            cursor.execute(f"""SELECT COUNT(DISTINCT ID_Operatore) as tot FROM {TABLE_NAME}""")
             row = cursor.fetchone()
             result["operatori"] = int(row["tot"]) if row and row["tot"] else 0
             
             # Fascicoli unici
-            cursor.execute("""SELECT COUNT(DISTINCT ID_Fascicolo) as tot FROM digitalizzazione""")
+            cursor.execute(f"""SELECT COUNT(DISTINCT ID_Fascicolo) as tot FROM {TABLE_NAME}""")
             row = cursor.fetchone()
             result["fascicoli"] = int(row["tot"]) if row and row["tot"] else 0
             
             # Media giornaliera (gestisce date stringa)
-            cursor.execute("""SELECT AVG(daily_total) as avg_tot FROM 
+            cursor.execute(f"""SELECT AVG(daily_total) as avg_tot FROM 
                              (SELECT SUM(conta_pagine_giorno) as daily_total
-                              FROM digitalizzazione 
+                              FROM {TABLE_NAME} 
                               WHERE Attivita = 'Inserimento_Pagina'
                               GROUP BY Data_Attivita) as daily""")
             row = cursor.fetchone()
@@ -366,14 +370,14 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT 
                     ID_Operatore,
                     Nome_operatore,
                     COUNT(*) as giorni_penale,
                     SUM(2400 - conta_pagine_giorno) as pagine_mancanti,
                     ROUND(SUM((2400 - conta_pagine_giorno) * 0.05), 2) as totale_penale
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 WHERE ID_attivita = 1
                   AND conta_pagine_giorno < 2400
                   AND CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
@@ -406,9 +410,9 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT DISTINCT CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) as mese
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 WHERE Data_Attivita IS NOT NULL AND Data_Attivita != ''
                 ORDER BY mese DESC
             """
@@ -434,9 +438,9 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Operatore, Nome_operatore, Data_Attivita, Attivita, Sede, COUNT(*) as conteggio
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 GROUP BY ID_Operatore, Nome_operatore, Data_Attivita, Attivita, Sede
                 HAVING conteggio > 1
                 ORDER BY Data_Attivita DESC, Nome_operatore
@@ -465,11 +469,11 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Operatore, Nome_operatore, COUNT(DISTINCT Data_Attivita) as giorni_trasferta
                 FROM (
                     SELECT ID_Operatore, Nome_operatore, Data_Attivita
-                    FROM digitalizzazione
+                    FROM {TABLE_NAME}
                     WHERE CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
                     GROUP BY ID_Operatore, Nome_operatore, Data_Attivita
                     HAVING COUNT(DISTINCT Sede) > 1
@@ -503,13 +507,13 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Operatore,Nome_operatore,
                     SUM(CASE WHEN ID_attivita = 1 THEN conta_pagine_giorno ELSE 0 END) as pag_inserite,
                     SUM(CASE WHEN ID_attivita = -1 THEN conta_pagine_giorno ELSE 0 END) as pag_eliminate,
                     SUM(conta_pagine_giorno * ID_attivita) as pagine_nette,
                     ROUND(SUM(conta_pagine_giorno * ID_attivita) * 0.139, 2) as totale_pagamento
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 WHERE CONCAT(SUBSTRING(Data_Attivita, 7, 4), '-', SUBSTRING(Data_Attivita, 4, 2)) = %s
                 GROUP BY ID_Operatore, Nome_operatore
                 HAVING pagine_nette > 0
@@ -538,9 +542,9 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Operatore, Nome_operatore
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 WHERE Ufficio IN ('Contabilita', 'Personale')
                 GROUP BY ID_Operatore, Nome_operatore
                 HAVING COUNT(DISTINCT Ufficio) = 2
@@ -565,11 +569,11 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                     SELECT ID_Operatore, Nome_operatore
-                    FROM digitalizzazione
+                    FROM {TABLE_NAME}
                     GROUP BY ID_Operatore, Nome_operatore
-                    HAVING COUNT(DISTINCT Sede) = (SELECT COUNT(DISTINCT Sede) FROM digitalizzazione)
+                    HAVING COUNT(DISTINCT Sede) = (SELECT COUNT(DISTINCT Sede) FROM {TABLE_NAME})
                     ORDER BY Nome_operatore \
                     """
             cursor.execute(query)
@@ -595,11 +599,11 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Fascicolo,
                        COUNT(DISTINCT Anno_fascicolo) AS anni_distinti,
                        GROUP_CONCAT(DISTINCT Anno_fascicolo ORDER BY Anno_fascicolo) AS anni
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 GROUP BY ID_Fascicolo
                 HAVING anni_distinti > 1
                 ORDER BY ID_Fascicolo
@@ -623,18 +627,18 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT 'ID con più nomi' AS tipo,
                        CAST(ID_Operatore AS CHAR) AS identificatore,
                        GROUP_CONCAT(DISTINCT Nome_operatore ORDER BY Nome_operatore) AS valori
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 GROUP BY ID_Operatore
                 HAVING COUNT(DISTINCT Nome_operatore) > 1
                 UNION ALL
                 SELECT 'Nome con più ID',
                        Nome_operatore,
                        GROUP_CONCAT(DISTINCT ID_Operatore ORDER BY ID_Operatore)
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 GROUP BY Nome_operatore
                 HAVING COUNT(DISTINCT ID_Operatore) > 1
             """
@@ -657,9 +661,9 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_attivita, Attivita, COUNT(*) AS occorrenze
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 WHERE NOT (
                     (ID_attivita = 1  AND LOWER(Attivita) = 'inserimento_pagina') OR
                     (ID_attivita = -1 AND LOWER(Attivita) = 'eliminazione_pagina')
@@ -685,11 +689,11 @@ class DAO:
             return result
         try:
             cursor = cnx.cursor(dictionary=True)
-            query = """
+            query = f"""
                 SELECT ID_Fascicolo,
                        COUNT(DISTINCT Sede) AS num_sedi,
                        GROUP_CONCAT(DISTINCT Sede ORDER BY Sede) AS sedi
-                FROM digitalizzazione
+                FROM {TABLE_NAME}
                 GROUP BY ID_Fascicolo
                 HAVING num_sedi > 1
                 ORDER BY ID_Fascicolo

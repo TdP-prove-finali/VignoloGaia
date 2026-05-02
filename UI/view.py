@@ -435,6 +435,27 @@ class View(ft.UserControl):
         if self._controller:
             self._controller.on_file_result(e)
 
+    def mostra_errori_csv(self, errori: dict):
+        """Mostra le anomalie di validazione CSV in csv_status (import bloccato)."""
+        totale = sum(len(v) for v in errori.values())
+        righe = [f"Import bloccato: trovate {totale} anomalie nel CSV."]
+        etichette = {
+            "ufficio": "Ufficio non valido (ammessi: Contabilità, Personale)",
+            "sede":    "Sede non valida (ammesse: sede3, sede6, sede8, sede9, sede13, sede16)",
+            "data":    "Data fuori range (ottobre 2025 - dicembre 2026)",
+        }
+        for chiave, anomalie in errori.items():
+            if not anomalie:
+                continue
+            righe.append(f"\n{etichette[chiave]} ({len(anomalie)}):")
+            for riga, valore in anomalie[:10]:
+                righe.append(f"  - riga {riga}: '{valore}'")
+            if len(anomalie) > 10:
+                righe.append(f"  ... e altre {len(anomalie) - 10}")
+        self.csv_status.value = "\n".join(righe)
+        self.csv_status.color = ROSSO
+        self._page.update()
+
 
     # PAGINA 3: AI ASSISTANT
 
@@ -509,10 +530,6 @@ class View(ft.UserControl):
 
     def update_ai_status(self, msg: str):
         self.ai_status_text.value = msg
-        self._page.update()
-
-    def set_ai_progress(self, visible: bool):
-        self.ai_progress.visible = visible
         self._page.update()
 
 
@@ -742,14 +759,6 @@ class View(ft.UserControl):
         self._page.dialog = dlg
         dlg.open = True
         self._page.update()
-
-    @property
-    def controller(self):
-        return self._controller
-
-    @controller.setter
-    def controller(self, controller):
-        self._controller = controller
 
     def set_controller(self, controller):
         self._controller = controller

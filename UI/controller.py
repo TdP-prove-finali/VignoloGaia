@@ -297,6 +297,13 @@ class Controller:
             # Carica il CSV nel modello
             self._model.load_csv_file(self._selected_file_path)
 
+            # Validazione preventiva: blocca l'import se ci sono valori non ammessi
+            errori = self._model.validate_csv()
+            if any(errori.values()):
+                self._view.mostra_errori_csv(errori)
+                self._model.clear_csv_data()
+                return
+
             # Importa riga per riga
             rows = self._model.get_csv_rows()
             for i in range(len(rows)):
